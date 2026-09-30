@@ -4,6 +4,8 @@ import { colors } from '../theme';
 import { useProfile } from '../ProfileContext';
 import { BigButton, Body, Card, Option, Title } from '../ui';
 import { Lang, Need, TextSize } from '../storage';
+import Contacts from './Contacts';
+import SosGuide from './SosGuide';
 
 const LANGS: { id: Lang; label: string }[] = [
   { id: 'en', label: 'English' },
@@ -45,7 +47,8 @@ export default function Settings() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: 20, paddingTop: 56, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: 20, paddingTop: 56, paddingBottom: 200 }}
+      keyboardShouldPersistTaps="handled"
     >
       <Title>Settings</Title>
 
@@ -82,6 +85,11 @@ export default function Settings() {
           onPress={() => toggleNeed(n.id)}
         />
       ))}
+            <Body>{' '}</Body>
+      <Contacts />
+
+      <Body>{' '}</Body>
+      <SosGuide />
 
       <Body>{' '}</Body>
       <Card>

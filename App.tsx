@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StatusBar, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StatusBar, Text, View } from 'react-native';
 import { colors } from './src/theme';
 import { ProfileProvider, useProfile } from './src/ProfileContext';
 import { ErrorBoundary } from './src/ErrorBoundary';
@@ -8,6 +8,8 @@ import Dashboard from './src/screens/Dashboard';
 import Assistant from './src/screens/Assistant';
 import Learn from './src/screens/Learn';
 import Settings from './src/screens/Settings';
+import SosScreen from './src/screens/SosScreen';
+import { useSosShortcut } from './src/shortcuts';
 
 type Tab = 'home' | 'assistant' | 'learn' | 'settings';
 
@@ -42,10 +44,10 @@ function TabButton({ tab, active, onPress }: { tab: (typeof TABS)[number]; activ
   );
 }
 
-function SosButton() {
+function SosButton({ onPress }: { onPress: () => void }) {
   return (
     <Pressable
-      onPress={() => Alert.alert('SOS', 'Emergency help will be connected in the next step.')}
+      onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="SOS emergency help"
       style={{
@@ -68,6 +70,8 @@ function SosButton() {
 function Shell() {
   const { error } = useProfile();
   const [tab, setTab] = useState<Tab>('home');
+  const [sosOpen, setSosOpen] = useState(false);
+  useSosShortcut(() => setSosOpen(true));
 
   let screen: React.ReactNode = <Dashboard />;
   if (tab === 'assistant') screen = <Assistant />;
@@ -102,11 +106,12 @@ function Shell() {
         {left.map((t) => (
           <TabButton key={t.id} tab={t} active={tab === t.id} onPress={() => setTab(t.id)} />
         ))}
-        <SosButton />
+        <SosButton onPress={() => setSosOpen(true)} />
         {right.map((t) => (
           <TabButton key={t.id} tab={t} active={tab === t.id} onPress={() => setTab(t.id)} />
         ))}
       </View>
+      <SosScreen visible={sosOpen} onClose={() => setSosOpen(false)} />
     </View>
   );
 }
