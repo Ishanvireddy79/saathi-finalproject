@@ -7,6 +7,7 @@ import { ErrorBoundary } from '../ErrorBoundary';
 import { BigButton, Body, Card, Title } from '../ui';
 import { BOARD, Phrase, loadPhrases, savePhrases, voiceLanguage } from '../phrases';
 import { hasVoiceFor, installHelp } from '../voices';
+import { TARGET_NAMES, Target, translateEnglishTo } from '../translate';
 
 type Mode = 'type' | 'phrases' | 'pictures';
 
@@ -16,14 +17,22 @@ const MODES: { id: Mode; label: string }[] = [
   { id: 'pictures', label: 'Pictures' },
 ];
 
+const TARGETS: { id: Target; label: string }[] = [
+  { id: 'asis', label: 'As typed' },
+  { id: 'hi', label: 'Hindi' },
+  { id: 'te', label: 'Telugu' },
+];
+
 function Inner({ onClose }: { onClose: () => void }) {
   const { fs } = useProfile();
   const [mode, setMode] = useState<Mode>('type');
+  const [target, setTarget] = useState<Target>('asis');
   const [text, setText] = useState('');
   const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [newPhrase, setNewPhrase] = useState('');
   const [speaking, setSpeaking] = useState(false);
   const [status, setStatus] = useState('');
+  const [translated, setTranslated] = useState('');
 
   useEffect(() => {
     loadPhrases()
@@ -53,7 +62,22 @@ function Inner({ onClose }: { onClose: () => void }) {
       setStatus('Please type something first.');
       return;
     }
-    const lang = voiceLanguage(msg);
+    let toSpeak = msg;
+    let lang = voiceLanguage(msg);
+    setTranslated('');
+
+    if (target !== 'asis' && lang === 'en-IN') {
+      try {
+        setStatus('Translating to ' + TARGET_NAMES[target] + '...');
+        toSpeak = await translateEnglishTo(msg, target);
+        lang = target === 'hi' ? 'hi-IN' : 'te-IN';
+        setTranslated(toSpeak);
+      } catch (e: any) {
+        setStatus('Could not translate: ' + (e?.message ?? String(e)));
+        return;
+      }
+    }
+
     let note = '';
     if (lang !== 'en-IN' && !(await hasVoiceFor(lang))) {
       note = installHelp(lang);
@@ -62,7 +86,7 @@ function Inner({ onClose }: { onClose: () => void }) {
       Speech.stop();
       setSpeaking(true);
       setStatus(note);
-      Speech.speak(msg, {
+      Speech.speak(toSpeak, {
         language: lang,
         rate: 0.9,
         onDone: () => setSpeaking(false),
@@ -151,6 +175,44 @@ function Inner({ onClose }: { onClose: () => void }) {
         ))}
       </View>
 
+      <Body>Speak in</Body>
+      <View style={{ flexDirection: 'row', marginTop: 6, marginBottom: 12 }}>
+        {TARGETS.map((tg) => (
+          <Pressable
+            key={tg.id}
+            onPress={() => {
+              setTarget(tg.id);
+              setTranslated('');
+              setStatus('');
+            }}
+            accessibilityRole="radio"
+            accessibilityLabel={'Speak in ' + tg.label}
+            accessibilityState={{ selected: target === tg.id }}
+            style={{
+              flex: 1,
+              minHeight: 64,
+              borderRadius: 16,
+              marginHorizontal: 3,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: target === tg.id ? colors.accent : colors.card,
+              borderWidth: 1.5,
+              borderColor: target === tg.id ? colors.accent : colors.border,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: fs(17),
+                fontWeight: 'bold',
+                color: target === tg.id ? colors.accentText : colors.text,
+              }}
+            >
+              {tg.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
       {speaking ? <BigButton label="Stop speaking" onPress={stop} /> : null}
 
       {mode === 'type' && (
@@ -171,6 +233,7 @@ function Inner({ onClose }: { onClose: () => void }) {
             onPress={() => {
               setText('');
               setStatus('');
+              setTranslated('');
             }}
           />
         </View>
@@ -255,6 +318,16 @@ function Inner({ onClose }: { onClose: () => void }) {
         </View>
       )}
 
+      {translated ? (
+        <Card style={{ marginTop: 8 }}>
+          <Body muted>{'In ' + TARGET_NAMES[target] + ':'}</Body>
+          <Text selectable style={{ fontSize: fs(22), lineHeight: fs(30), color: colors.text }}>
+            {translated}
+          </Text>
+          <Body muted>Machine translation by Google ML Kit. It can contain mistakes.</Body>
+        </Card>
+      ) : null}
+
       {status ? (
         <Text
           accessibilityLiveRegion="polite"
@@ -267,7 +340,7 @@ function Inner({ onClose }: { onClose: () => void }) {
       <Text style={{ height: 12 }} />
       <Body muted>
         If you hear nothing, turn up the volume. Your phone must have a voice installed for the
-        language you type.
+        language you choose.
       </Body>
       <BigButton
         label="Close"
