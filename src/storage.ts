@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 
 export type Need = 'blind' | 'deaf' | 'speech';
 export type TextSize = 'normal' | 'large' | 'xlarge';
@@ -31,5 +32,10 @@ export async function saveProfile(p: Profile): Promise<void> {
 }
 
 export async function resetAll(): Promise<void> {
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+  } catch {
+    // Nothing scheduled. Carry on.
+  }
   await AsyncStorage.clear();
 }

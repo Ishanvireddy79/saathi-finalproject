@@ -1,12 +1,51 @@
-import React from 'react';
-import { ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ScrollView, Text } from 'react-native';
 import { colors } from '../theme';
 import { useProfile } from '../ProfileContext';
-import { Body, Card, Title } from '../ui';
+import { BigButton, Body, Card, Title } from '../ui';
+import Reminders from './Reminders';
+import {
+  Appointment,
+  Medicine,
+  apptTime,
+  fmtDate,
+  fmtTime,
+  loadAppointments,
+  loadMedicines,
+} from '../reminders';
 
 export default function Dashboard() {
-  const { profile } = useProfile();
+  const { profile, fs } = useProfile();
   const { needs } = profile;
+  const [meds, setMeds] = useState<Medicine[]>([]);
+  const [appts, setAppts] = useState<Appointment[]>([]);
+  const [open, setOpen] = useState(false);
+  const [err, setErr] = useState('');
+
+  const refresh = useCallback(() => {
+    Promise.all([loadMedicines(), loadAppointments()])
+      .then(([m, a]) => {
+        setMeds([...m].sort((x, y) => x.hour * 60 + x.minute - (y.hour * 60 + y.minute)));
+        const now = Date.now();
+        setAppts(
+          a
+            .filter((x) => apptTime(x) >= now)
+            .sort((x, y) => apptTime(x) - apptTime(y))
+            .slice(0, 3)
+        );
+        setErr('');
+      })
+      .catch((e: any) => setErr('Could not load reminders: ' + (e?.message ?? String(e))));
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const closeReminders = () => {
+    setOpen(false);
+    refresh();
+  };
 
   return (
     <ScrollView
@@ -14,11 +53,39 @@ export default function Dashboard() {
       contentContainerStyle={{ padding: 20, paddingTop: 56 }}
     >
       <Title>Hello, friend</Title>
-      <Body muted>Here is your home. More will appear here soon.</Body>
+      <Body muted>Here is your home.</Body>
       <Body>{' '}</Body>
 
       <Card>
-        <Body>🆘 Emergency help will be connected in the next step. The red button below is always there.</Body>
+        <Body>🆘 In an emergency, tap the red SOS button at the bottom.</Body>
+      </Card>
+
+      <Card>
+        <Body>💊 Your medicines</Body>
+        {meds.length === 0 ? (
+          <Body muted>None yet.</Body>
+        ) : (
+          meds.map((m) => (
+            <Body key={m.id} muted>
+              {fmtTime(m.hour, m.minute) + '  ' + m.name + (m.dose ? ' (' + m.dose + ')' : '')}
+            </Body>
+          ))
+        )}
+        <Text style={{ height: 8 }} />
+        <Body>📅 Next appointments</Body>
+        {appts.length === 0 ? (
+          <Body muted>None yet.</Body>
+        ) : (
+          appts.map((a) => (
+            <Body key={a.id} muted>
+              {fmtDate(a) + '  ' + fmtTime(a.hour, a.minute) + '  ' + a.title}
+            </Body>
+          ))
+        )}
+        {err ? (
+          <Text style={{ fontSize: fs(16), color: colors.sos, marginTop: 8 }}>{err}</Text>
+        ) : null}
+        <BigButton label="Add or change" onPress={() => setOpen(true)} />
       </Card>
 
       {needs.includes('blind') && (
@@ -37,15 +104,11 @@ export default function Dashboard() {
         </Card>
       )}
 
-      <Card>
-        <Body>💊 Your medicines and appointments. Coming soon.</Body>
+      <Card style={{ backgroundColor: colors.sageSoft }}>
+        <Body>Saathi is a helper. It does not replace a cane, a guide or a doctor.</Body>
       </Card>
 
-      <Card style={{ backgroundColor: colors.sageSoft }}>
-        <Body>
-          Saathi is a helper. It does not replace a cane, a guide or a doctor.
-        </Body>
-      </Card>
+      <Reminders visible={open} onClose={closeReminders} />
     </ScrollView>
   );
 }
