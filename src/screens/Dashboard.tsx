@@ -4,6 +4,7 @@ import { colors } from '../theme';
 import { useProfile } from '../ProfileContext';
 import { BigButton, Body, Card, Title } from '../ui';
 import Reminders from './Reminders';
+import CameraScreen from './CameraScreen';
 import {
   Appointment,
   Medicine,
@@ -20,6 +21,7 @@ export default function Dashboard() {
   const [meds, setMeds] = useState<Medicine[]>([]);
   const [appts, setAppts] = useState<Appointment[]>([]);
   const [open, setOpen] = useState(false);
+  const [camOpen, setCamOpen] = useState(false);
   const [err, setErr] = useState('');
 
   const refresh = useCallback(() => {
@@ -90,7 +92,9 @@ export default function Dashboard() {
 
       {needs.includes('blind') && (
         <Card>
-          <Body>👁️ See around me and read text. Coming soon.</Body>
+          <Body>👁️ See around me and read text.</Body>
+          <Body muted>Works without internet. Camera test for now. Reading and describing come next.</Body>
+          <BigButton label="Open camera" onPress={() => setCamOpen(true)} />
         </Card>
       )}
       {needs.includes('deaf') && (
@@ -109,6 +113,7 @@ export default function Dashboard() {
       </Card>
 
       <Reminders visible={open} onClose={closeReminders} />
+      <CameraScreen visible={camOpen} onClose={() => setCamOpen(false)} />
     </ScrollView>
   );
 }
