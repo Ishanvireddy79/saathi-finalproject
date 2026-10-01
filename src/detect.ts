@@ -1,4 +1,5 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import { File, Paths } from 'expo-file-system';
 import { decode } from 'jpeg-js';
 import { loadTensorflowModel } from 'react-native-fast-tflite';
 
@@ -44,13 +45,32 @@ function base64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
+// The model library can only open a real file. So the first time, we unpack
+// the model from the app into the phone's private storage, then reuse it.
+function ensureModelFile(): string {
+  const data = require('./modelData.json') as { size: number; b64: string };
+  const file = new File(Paths.document, 'efficientdet_lite0.tflite');
+  let ok = false;
+  try {
+    ok = file.exists && file.size === data.size;
+  } catch {
+    ok = false;
+  }
+  if (!ok) {
+    const bytes = base64ToBytes(data.b64);
+    file.create({ overwrite: true });
+    file.write(bytes);
+  }
+  return file.uri;
+}
+
 let modelPromise: Promise<any> | null = null;
 function getModel(): Promise<any> {
   if (!modelPromise) {
-    modelPromise = loadTensorflowModel(
-      require('../assets/efficientdet_lite0.tflite'),
-      []
-    ).catch((e: any) => {
+    modelPromise = (async () => {
+      const uri = ensureModelFile();
+      return loadTensorflowModel({ url: uri }, []);
+    })().catch((e: any) => {
       modelPromise = null;
       throw e;
     });
@@ -125,7 +145,7 @@ export async function describeSurroundings(
   onStage('Step 1 of 3: preparing the picture...');
   const input = await prepareInput(photoUri);
 
-  onStage('Step 2 of 3: loading the model...');
+  onStage('Step 2 of 3: loading the model (the first time takes longer)...');
   const model = await getModel();
 
   onStage('Step 3 of 3: looking for objects...');
