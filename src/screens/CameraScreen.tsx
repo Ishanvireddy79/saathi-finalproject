@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   Camera,
@@ -7,6 +7,7 @@ import {
   usePhotoOutput,
 } from 'react-native-vision-camera';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
+import * as Speech from 'expo-speech';
 import { colors } from '../theme';
 import { useProfile } from '../ProfileContext';
 import { ErrorBoundary } from '../ErrorBoundary';
@@ -21,9 +22,50 @@ function CameraInner({ onClose }: { onClose: () => void }) {
   const [uri, setUri] = useState('');
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      try {
+        Speech.stop();
+      } catch {
+        // Nothing to stop.
+      }
+    };
+  }, []);
+
+  const stopSpeaking = () => {
+    try {
+      Speech.stop();
+    } catch {
+      // Nothing to stop.
+    }
+    setSpeaking(false);
+  };
+
+  const speak = (t: string) => {
+    try {
+      Speech.stop();
+      setSpeaking(true);
+      Speech.speak(t, {
+        language: 'en-IN',
+        rate: 0.9,
+        onDone: () => setSpeaking(false),
+        onStopped: () => setSpeaking(false),
+        onError: (e: any) => {
+          setSpeaking(false);
+          setStatus('Could not speak: ' + (e?.message ?? String(e)));
+        },
+      });
+    } catch (e: any) {
+      setSpeaking(false);
+      setStatus('Could not speak: ' + (e?.message ?? String(e)));
+    }
+  };
 
   const takePhoto = async () => {
     try {
+      stopSpeaking();
       setStatus('Taking photo...');
       const photo = await (photoOutput as any).capturePhoto({}, {});
       try {
@@ -42,15 +84,18 @@ function CameraInner({ onClose }: { onClose: () => void }) {
   const readText = async () => {
     try {
       setBusy(true);
+      stopSpeaking();
       setStatus('Reading the text...');
       const result = await TextRecognition.recognize(uri);
       const t = (result?.text ?? '').trim();
       setText(t);
-      setStatus(
-        t
-          ? 'Done.'
-          : 'No text found. Try again with more light and hold the phone steady.'
-      );
+      if (t) {
+        setStatus('Reading it aloud.');
+        speak(t);
+      } else {
+        setStatus('No text found. Try again with more light and hold the phone steady.');
+        speak('No text found. Try again with more light.');
+      }
     } catch (e: any) {
       setStatus('Could not read text: ' + (e?.message ?? String(e)));
     } finally {
@@ -88,18 +133,25 @@ function CameraInner({ onClose }: { onClose: () => void }) {
           />
           <BigButton label="Read text" onPress={readText} disabled={busy} />
           {text ? (
-            <Card style={{ marginTop: 12 }}>
-              <Text
-                selectable
-                style={{ fontSize: fs(20), lineHeight: fs(28), color: colors.text }}
-              >
-                {text}
-              </Text>
-            </Card>
+            <>
+              <BigButton
+                label={speaking ? 'Stop reading' : 'Read aloud again'}
+                onPress={() => (speaking ? stopSpeaking() : speak(text))}
+              />
+              <Card style={{ marginTop: 12 }}>
+                <Text
+                  selectable
+                  style={{ fontSize: fs(20), lineHeight: fs(28), color: colors.text }}
+                >
+                  {text}
+                </Text>
+              </Card>
+            </>
           ) : null}
           <BigButton
             label="Take another photo"
             onPress={() => {
+              stopSpeaking();
               setUri('');
               setText('');
               setStatus('');
@@ -129,7 +181,13 @@ function CameraInner({ onClose }: { onClose: () => void }) {
         </Text>
       ) : null}
 
-      <BigButton label="Close" onPress={onClose} />
+      <BigButton
+        label="Close"
+        onPress={() => {
+          stopSpeaking();
+          onClose();
+        }}
+      />
     </View>
   );
 }
