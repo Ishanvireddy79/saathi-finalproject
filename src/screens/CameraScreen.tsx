@@ -12,6 +12,7 @@ import { colors } from '../theme';
 import { useProfile } from '../ProfileContext';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { BigButton, Body, Card, Title } from '../ui';
+import { describeSurroundings } from '../detect';
 
 function CameraInner({ onClose }: { onClose: () => void }) {
   const { fs } = useProfile();
@@ -21,8 +22,11 @@ function CameraInner({ onClose }: { onClose: () => void }) {
   const [status, setStatus] = useState('');
   const [uri, setUri] = useState('');
   const [text, setText] = useState('');
+  const [seen, setSeen] = useState('');
+  const [debug, setDebug] = useState('');
   const [busy, setBusy] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [lastSpoken, setLastSpoken] = useState('');
 
   useEffect(() => {
     return () => {
@@ -47,6 +51,7 @@ function CameraInner({ onClose }: { onClose: () => void }) {
     try {
       Speech.stop();
       setSpeaking(true);
+      setLastSpoken(t);
       Speech.speak(t, {
         language: 'en-IN',
         rate: 0.9,
@@ -63,6 +68,12 @@ function CameraInner({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const clearResults = () => {
+    setText('');
+    setSeen('');
+    setDebug('');
+  };
+
   const takePhoto = async () => {
     try {
       stopSpeaking();
@@ -71,7 +82,7 @@ function CameraInner({ onClose }: { onClose: () => void }) {
       try {
         const path = await photo.saveToTemporaryFileAsync();
         setUri(path.startsWith('file://') ? path : 'file://' + path);
-        setText('');
+        clearResults();
         setStatus('Photo taken.');
       } finally {
         photo.dispose();
@@ -85,6 +96,7 @@ function CameraInner({ onClose }: { onClose: () => void }) {
     try {
       setBusy(true);
       stopSpeaking();
+      clearResults();
       setStatus('Reading the text...');
       const result = await TextRecognition.recognize(uri);
       const t = (result?.text ?? '').trim();
@@ -103,6 +115,23 @@ function CameraInner({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const lookAround = async () => {
+    try {
+      setBusy(true);
+      stopSpeaking();
+      clearResults();
+      const r = await describeSurroundings(uri, setStatus);
+      setSeen(r.sentence);
+      setDebug(r.debug);
+      setStatus('Done.');
+      speak(r.sentence);
+    } catch (e: any) {
+      setStatus('Could not look around: ' + (e?.message ?? String(e)));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const askPermission = async () => {
     try {
       const ok = await requestPermission();
@@ -112,13 +141,15 @@ function CameraInner({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const shown = seen || text;
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, padding: 20, paddingTop: 56 }}>
-      <Title>Read text</Title>
+      <Title>Camera</Title>
 
       {!hasPermission ? (
         <View>
-          <Body>Saathi needs the camera to look at text for you. The photo stays on your phone.</Body>
+          <Body>Saathi needs the camera to look around and read for you. The photo stays on your phone.</Body>
           <BigButton label="Allow camera" onPress={askPermission} />
         </View>
       ) : !device ? (
@@ -129,23 +160,37 @@ function CameraInner({ onClose }: { onClose: () => void }) {
             source={{ uri }}
             resizeMode="contain"
             accessibilityLabel="The photo you just took"
-            style={{ height: 240, borderRadius: 16 }}
+            style={{ height: 220, borderRadius: 16 }}
           />
+          <BigButton label="What is around me?" onPress={lookAround} disabled={busy} />
           <BigButton label="Read text" onPress={readText} disabled={busy} />
-          {text ? (
+          {shown ? (
             <>
               <BigButton
-                label={speaking ? 'Stop reading' : 'Read aloud again'}
-                onPress={() => (speaking ? stopSpeaking() : speak(text))}
+                label={speaking ? 'Stop speaking' : 'Say it again'}
+                onPress={() => (speaking ? stopSpeaking() : speak(lastSpoken || shown))}
               />
               <Card style={{ marginTop: 12 }}>
                 <Text
                   selectable
                   style={{ fontSize: fs(20), lineHeight: fs(28), color: colors.text }}
                 >
-                  {text}
+                  {shown}
                 </Text>
               </Card>
+            </>
+          ) : null}
+          {seen ? (
+            <>
+              {debug ? (
+                <Text selectable style={{ fontSize: fs(14), color: colors.muted, marginTop: 4 }}>
+                  {debug}
+                </Text>
+              ) : null}
+              <Body muted>
+                Saathi can miss things or get them wrong. It says where something is, not how far
+                away. It does not replace a cane or a guide.
+              </Body>
             </>
           ) : null}
           <BigButton
@@ -153,7 +198,7 @@ function CameraInner({ onClose }: { onClose: () => void }) {
             onPress={() => {
               stopSpeaking();
               setUri('');
-              setText('');
+              clearResults();
               setStatus('');
             }}
           />

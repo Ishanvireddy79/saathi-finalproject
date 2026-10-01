@@ -5,6 +5,7 @@ import { useProfile } from '../ProfileContext';
 import { BigButton, Body, Card, Title } from '../ui';
 import Reminders from './Reminders';
 import CameraScreen from './CameraScreen';
+import ModelCheck from './ModelCheck';
 import {
   Appointment,
   Medicine,
@@ -22,6 +23,7 @@ export default function Dashboard() {
   const [appts, setAppts] = useState<Appointment[]>([]);
   const [open, setOpen] = useState(false);
   const [camOpen, setCamOpen] = useState(false);
+  const [modelOpen, setModelOpen] = useState(false);
   const [err, setErr] = useState('');
 
   const refresh = useCallback(() => {
@@ -95,6 +97,7 @@ export default function Dashboard() {
           <Body>👁️ See around me and read text.</Body>
           <Body muted>Works without internet. Camera test for now. Reading and describing come next.</Body>
           <BigButton label="Open camera" onPress={() => setCamOpen(true)} />
+          <BigButton label="Model check (test)" onPress={() => setModelOpen(true)} />
         </Card>
       )}
       {needs.includes('deaf') && (
@@ -114,6 +117,7 @@ export default function Dashboard() {
 
       <Reminders visible={open} onClose={closeReminders} />
       <CameraScreen visible={camOpen} onClose={() => setCamOpen(false)} />
+      <ModelCheck visible={modelOpen} onClose={() => setModelOpen(false)} />
     </ScrollView>
   );
 }
