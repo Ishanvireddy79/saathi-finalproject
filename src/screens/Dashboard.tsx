@@ -5,7 +5,7 @@ import { useProfile } from '../ProfileContext';
 import { BigButton, Body, Card, Title } from '../ui';
 import Reminders from './Reminders';
 import CameraScreen from './CameraScreen';
-import ModelCheck from './ModelCheck';
+import SpeakScreen from './SpeakScreen';
 import {
   Appointment,
   Medicine,
@@ -23,7 +23,7 @@ export default function Dashboard() {
   const [appts, setAppts] = useState<Appointment[]>([]);
   const [open, setOpen] = useState(false);
   const [camOpen, setCamOpen] = useState(false);
-  const [modelOpen, setModelOpen] = useState(false);
+  const [speakOpen, setSpeakOpen] = useState(false);
   const [err, setErr] = useState('');
 
   const refresh = useCallback(() => {
@@ -94,10 +94,9 @@ export default function Dashboard() {
 
       {needs.includes('blind') && (
         <Card>
-          <Body>👁️ See around me and read text.</Body>
-          <Body muted>Works without internet. Camera test for now. Reading and describing come next.</Body>
+          <Body>👁️ See around me and read text</Body>
+          <Body muted>Works without internet.</Body>
           <BigButton label="Open camera" onPress={() => setCamOpen(true)} />
-          <BigButton label="Model check (test)" onPress={() => setModelOpen(true)} />
         </Card>
       )}
       {needs.includes('deaf') && (
@@ -107,7 +106,9 @@ export default function Dashboard() {
       )}
       {needs.includes('speech') && (
         <Card>
-          <Body>💬 Type to speak and quick phrases. Coming soon.</Body>
+          <Body>💬 Speak for me</Body>
+          <Body muted>Type, tap a phrase, or tap a picture. Your phone says it aloud. Works without internet.</Body>
+          <BigButton label="Open Speak for me" onPress={() => setSpeakOpen(true)} />
         </Card>
       )}
 
@@ -117,7 +118,7 @@ export default function Dashboard() {
 
       <Reminders visible={open} onClose={closeReminders} />
       <CameraScreen visible={camOpen} onClose={() => setCamOpen(false)} />
-      <ModelCheck visible={modelOpen} onClose={() => setModelOpen(false)} />
+      <SpeakScreen visible={speakOpen} onClose={() => setSpeakOpen(false)} />
     </ScrollView>
   );
 }
