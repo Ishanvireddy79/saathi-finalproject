@@ -15,7 +15,7 @@ import {
 } from './reminders';
 
 export type AgentAction = 'camera' | 'speak' | 'sos';
-export type AgentReply = { text: string; action?: AgentAction };
+export type AgentReply = { text: string; action?: AgentAction; needsOnline?: boolean };
 
 export const SUGGESTIONS = [
   'What can you do?',
@@ -211,6 +211,14 @@ async function respondInner(input: string): Promise<AgentReply> {
       action: 'sos',
     };
   }
+    // 1b. Medical advice questions are always refused, before anything else.
+    const MEDICAL_ADVICE =
+    /(medicine|medication|tablet|pill|drug|syrup|ointment|cream)s?\s+(for|to cure|to treat)\b|\b(should|can|could|may) i (take|use|have|eat)\b|\bwhat (should|can) i (take|do|use)\b|\bdosage\b|\bdose\b|diagnos|\bwhat do i have\b|\bwhat('?s| is) wrong with me\b|\bis it serious\b/;
+  if (MEDICAL_ADVICE.test(lower) && !/(remind|add|set|save|schedule)/.test(lower)) {
+    return {
+      text: 'I cannot give medical advice or say what is wrong. Please ask a doctor or a pharmacist. If it is an emergency, call 112.',
+    };
+  }
 
   // 2. Adding an appointment.
   if (/(appointment|check-?up|doctor visit|hospital visit)/.test(lower)) {
@@ -330,7 +338,8 @@ async function respondInner(input: string): Promise<AgentReply> {
   // 9. Needs internet.
   if (/(weather|news|score|price|who is|capital of|translate|search|google|youtube)/.test(lower)) {
     return {
-      text: 'That needs the internet. The online assistant is coming soon. Right now I work without internet.',
+      text: 'I can only answer that with the internet. Turn on Online help at the top of this page, then ask me again.',
+      needsOnline: true,
     };
   }
 
@@ -343,5 +352,6 @@ async function respondInner(input: string): Promise<AgentReply> {
 
   return {
     text: 'I did not understand that. I work with simple phrases right now. ' + CAPABILITIES,
+    needsOnline: true,
   };
 }

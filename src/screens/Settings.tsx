@@ -92,8 +92,12 @@ export default function Settings() {
       <SosGuide />
 
       <Body>{' '}</Body>
-      <Card>
-        <Body>Privacy: everything you enter stays on this phone.</Body>
+      <Card>       
+         <Body>
+          Privacy: everything you enter stays on this phone. The only exception is the words you type
+          to the assistant when you turn Online help on. Those are sent to a free AI service to get an
+          answer. Your medicines, appointments, contacts and location are never sent.
+        </Body>
       </Card>
       <Card style={{ backgroundColor: colors.sageSoft }}>
         <Body>

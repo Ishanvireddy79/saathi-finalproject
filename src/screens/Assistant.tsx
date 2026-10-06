@@ -1,15 +1,24 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import * as Speech from 'expo-speech';
 import { colors } from '../theme';
 import { useProfile } from '../ProfileContext';
 import { Title } from '../ui';
 import { AgentAction, SUGGESTIONS, respond } from '../agent';
+import { askOnline, isOnlineEnabled, setOnlineEnabled } from '../online';
+import { voiceLanguage } from '../phrases';
+import { hasVoiceFor, installHelp } from '../voices';
 import CameraScreen from './CameraScreen';
 import SpeakScreen from './SpeakScreen';
 import SosScreen from './SosScreen';
 
-type Msg = { id: string; from: 'me' | 'saathi'; text: string; action?: AgentAction };
+type Msg = {
+  id: string;
+  from: 'me' | 'saathi';
+  text: string;
+  action?: AgentAction;
+  online?: boolean;
+};
 
 const ACTION_LABEL: Record<AgentAction, string> = {
   camera: 'Open camera',
@@ -17,8 +26,11 @@ const ACTION_LABEL: Record<AgentAction, string> = {
   sos: 'Open emergency help',
 };
 
+const ONLINE_NOTICE =
+  'Online help is on. The words you type here are sent to a free AI service so I can answer more questions. Your medicines, appointments, contacts and location are never sent. The answers can be wrong, so please check anything important.';
+
 export default function Assistant() {
-  const { fs } = useProfile();
+  const { fs, profile } = useProfile();
   const scrollRef = useRef<ScrollView>(null);
   const counter = useRef(1);
   const [msgs, setMsgs] = useState<Msg[]>([
@@ -31,19 +43,42 @@ export default function Assistant() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [speakOn, setSpeakOn] = useState(true);
+  const [online, setOnline] = useState(false);
   const [camOpen, setCamOpen] = useState(false);
   const [speakOpen, setSpeakOpen] = useState(false);
   const [sosOpen, setSosOpen] = useState(false);
 
+  useEffect(() => {
+    isOnlineEnabled().then(setOnline);
+  }, []);
+
   const nextId = () => 'm' + counter.current++;
 
-  const speak = (t: string) => {
+  const add = (m: Omit<Msg, 'id'>) =>
+    setMsgs((cur) => [...cur, { id: nextId(), ...m }]);
+
+  const speak = async (t: string) => {
     try {
       Speech.stop();
-      Speech.speak(t, { language: 'en-IN', rate: 0.9 });
+      const lang = voiceLanguage(t);
+      if (lang !== 'en-IN' && !(await hasVoiceFor(lang))) {
+        add({ from: 'saathi', text: installHelp(lang) });
+      }
+      Speech.speak(t, { language: lang, rate: 0.9 });
     } catch {
       // Speaking is optional. The text is still on screen.
     }
+  };
+
+  const toggleOnline = async () => {
+    const next = !online;
+    setOnline(next);
+    try {
+      await setOnlineEnabled(next);
+    } catch {
+      // Not saving is fine. It just resets next time.
+    }
+    if (next) add({ from: 'saathi', text: ONLINE_NOTICE });
   };
 
   const send = async (raw: string) => {
@@ -55,12 +90,37 @@ export default function Assistant() {
       // Nothing to stop.
     }
     setInput('');
-    setMsgs((cur) => [...cur, { id: nextId(), from: 'me', text: t }]);
+    add({ from: 'me', text: t });
     setBusy(true);
     try {
       const r = await respond(t);
-      setMsgs((cur) => [...cur, { id: nextId(), from: 'saathi', text: r.text, action: r.action }]);
-      if (speakOn) speak(r.text);
+      let text = r.text;
+      let action = r.action;
+      let wasOnline = false;
+
+      if (r.needsOnline && online) {
+        try {
+          const history = [
+            ...msgs.map((m) => ({
+              role: m.from === 'me' ? ('user' as const) : ('assistant' as const),
+              content: m.text,
+            })),
+            { role: 'user' as const, content: t },
+          ].slice(-8);
+          text = await askOnline(history, profile.language);
+          action = undefined;
+          wasOnline = true;
+        } catch (e: any) {
+          text =
+            'I could not reach online help. ' +
+            (e?.message ?? String(e)) +
+            ' I can still help with reminders, the camera and emergencies.';
+          action = undefined;
+        }
+      }
+
+      add({ from: 'saathi', text, action, online: wasOnline });
+      if (speakOn) speak(text);
     } finally {
       setBusy(false);
     }
@@ -77,8 +137,36 @@ export default function Assistant() {
       <View style={{ paddingHorizontal: 20 }}>
         <Title>Assistant</Title>
         <Text style={{ fontSize: fs(15), color: colors.sage, marginTop: -6, marginBottom: 6 }}>
-          Offline mode. Works without internet.
+          {online
+            ? 'Online help is on. Offline features still work.'
+            : 'Offline mode. Works without internet.'}
         </Text>
+        <Pressable
+          onPress={toggleOnline}
+          accessibilityRole="switch"
+          accessibilityLabel="Online help"
+          accessibilityState={{ checked: online }}
+          style={{
+            minHeight: 64,
+            borderRadius: 16,
+            justifyContent: 'center',
+            paddingHorizontal: 16,
+            marginBottom: 6,
+            backgroundColor: online ? colors.sage : colors.card,
+            borderWidth: 1.5,
+            borderColor: online ? colors.sage : colors.border,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: fs(17),
+              fontWeight: 'bold',
+              color: online ? colors.accentText : colors.text,
+            }}
+          >
+            {online ? 'Online help: ON. Tap to turn off.' : 'Online help: OFF. Tap to turn on.'}
+          </Text>
+        </Pressable>
       </View>
 
       <ScrollView
@@ -113,6 +201,11 @@ export default function Assistant() {
               >
                 {m.text}
               </Text>
+              {m.online ? (
+                <Text style={{ fontSize: fs(13), color: colors.muted, marginTop: 6 }}>
+                  Online answer. It can contain mistakes.
+                </Text>
+              ) : null}
             </View>
             {m.action ? (
               <Pressable
@@ -135,6 +228,9 @@ export default function Assistant() {
             ) : null}
           </View>
         ))}
+        {busy ? (
+          <Text style={{ fontSize: fs(16), color: colors.muted, marginLeft: 6 }}>Thinking...</Text>
+        ) : null}
       </ScrollView>
 
       <ScrollView
