@@ -6,7 +6,19 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "plugins": ["expo-quick-actions", "expo-notifications", "react-native-fast-tflite"],
+    "plugins": [
+      "expo-quick-actions",
+      "expo-notifications",
+      "react-native-fast-tflite",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Saathi uses the microphone to show captions of what people say. Audio is not saved.",
+          "speechRecognitionPermission": "Saathi uses speech recognition to turn speech into text.",
+          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true
     },

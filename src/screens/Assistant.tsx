@@ -1,6 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import * as Speech from 'expo-speech';
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from 'expo-speech-recognition';
 import { colors } from '../theme';
 import { useProfile } from '../ProfileContext';
 import { Title } from '../ui';
@@ -37,25 +41,36 @@ export default function Assistant() {
     {
       id: 'm0',
       from: 'saathi',
-      text: 'Hello, friend. I am Saathi. I can add your medicines and appointments, open the camera, and help in an emergency. How can I help?',
+      text: 'Hello, friend. I am Saathi. I can add your medicines and appointments, open the camera, and help in an emergency. You can type, or tap the microphone and speak. How can I help?',
     },
   ]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [speakOn, setSpeakOn] = useState(true);
   const [online, setOnline] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [micNote, setMicNote] = useState('');
   const [camOpen, setCamOpen] = useState(false);
   const [speakOpen, setSpeakOpen] = useState(false);
   const [sosOpen, setSosOpen] = useState(false);
 
+  const lastHeard = useRef('');
+  const sendRef = useRef<(t: string) => void>(() => {});
+
   useEffect(() => {
     isOnlineEnabled().then(setOnline);
+    return () => {
+      try {
+        ExpoSpeechRecognitionModule.abort();
+      } catch {
+        // Nothing running.
+      }
+    };
   }, []);
 
   const nextId = () => 'm' + counter.current++;
 
-  const add = (m: Omit<Msg, 'id'>) =>
-    setMsgs((cur) => [...cur, { id: nextId(), ...m }]);
+  const add = (m: Omit<Msg, 'id'>) => setMsgs((cur) => [...cur, { id: nextId(), ...m }]);
 
   const speak = async (t: string) => {
     try {
@@ -125,6 +140,94 @@ export default function Assistant() {
       setBusy(false);
     }
   };
+  sendRef.current = send;
+
+  const speechLang =
+    profile.language === 'hi' ? 'hi-IN' : profile.language === 'te' ? 'te-IN' : 'en-IN';
+
+  const startMic = async () => {
+    try {
+      setMicNote('');
+      try {
+        Speech.stop();
+      } catch {
+        // Nothing to stop.
+      }
+      const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!perm.granted) {
+        setMicNote('The microphone permission was not given. Please allow it in your phone settings.');
+        return;
+      }
+      const needsInternet = speechLang === 'te-IN';
+      if (needsInternet && !online) {
+        setMicNote(
+          'Telugu voice needs the internet, because your phone has no offline Telugu pack. Turn on Online help, then try again. The sound goes to Google\'s speech service.'
+        );
+        return;
+      }
+      if (needsInternet) {
+        setMicNote('Telugu voice is sent to Google\'s speech service.');
+      }
+      lastHeard.current = '';
+      setInput('');
+      setListening(true);
+      ExpoSpeechRecognitionModule.start({
+        lang: speechLang,
+        interimResults: true,
+        continuous: false,
+        requiresOnDeviceRecognition: !needsInternet,
+      });
+    } catch (e: any) {
+      setListening(false);
+      setMicNote('Could not start the microphone: ' + (e?.message ?? String(e)));
+    }
+  };
+
+  const stopMic = () => {
+    try {
+      ExpoSpeechRecognitionModule.stop();
+    } catch {
+      setListening(false);
+    }
+  };
+
+  useSpeechRecognitionEvent('result', (event: any) => {
+    const t = String(event?.results?.[0]?.transcript ?? '').trim();
+    if (t) {
+      lastHeard.current = t;
+      setInput(t);
+    }
+  });
+
+  useSpeechRecognitionEvent('end', () => {
+    setListening(false);
+    const t = lastHeard.current.trim();
+    lastHeard.current = '';
+    if (t) sendRef.current(t);
+  });
+
+  useSpeechRecognitionEvent('error', (event: any) => {
+    const code = String(event?.error ?? '');
+    setListening(false);
+    lastHeard.current = '';
+    if (code === 'aborted') return;
+    setInput('');
+    if (code === 'no-speech' || code === 'speech-timeout') {
+      setMicNote('I did not hear anything. Tap the microphone and try again.');
+    } else if (code === 'language-not-supported' || code === 'network') {
+      setMicNote(
+        'The offline voice pack for this language is not ready. Open Captions and tap Download offline pack, or turn on Online help for Telugu.'
+      );
+    } else if (code === 'not-allowed' || code === 'service-not-allowed') {
+      setMicNote('The microphone or speech permission is blocked. Please allow it in your phone settings.');
+    } else if (code === 'audio-capture') {
+      setMicNote('The microphone could not be used. Another app may be using it.');
+    } else if (code === 'busy' || code === 'client') {
+      setMicNote('The microphone is busy. Please try again in a moment.');
+    } else {
+      setMicNote('Voice input stopped: ' + code + (event?.message ? ' (' + event.message + ')' : ''));
+    }
+  });
 
   const openAction = (a: AgentAction) => {
     if (a === 'camera') setCamOpen(true);
@@ -262,6 +365,15 @@ export default function Assistant() {
         ))}
       </ScrollView>
 
+      {micNote || listening ? (
+        <Text
+          accessibilityLiveRegion="polite"
+          style={{ fontSize: fs(15), color: colors.accent, paddingHorizontal: 16, paddingBottom: 4 }}
+        >
+          {listening ? 'Listening... speak now. Tap the microphone again to stop.' : micNote}
+        </Text>
+      ) : null}
+
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 8 }}>
         <TextInput
           value={input}
@@ -284,13 +396,30 @@ export default function Assistant() {
           }}
         />
         <Pressable
+          onPress={listening ? stopMic : startMic}
+          accessibilityRole="button"
+          accessibilityLabel={listening ? 'Stop listening' : 'Speak to Saathi'}
+          accessibilityState={{ selected: listening }}
+          style={{
+            minHeight: 64,
+            minWidth: 64,
+            marginLeft: 8,
+            borderRadius: 16,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: listening ? colors.sos : colors.sage,
+          }}
+        >
+          <Text style={{ fontSize: 26 }}>{listening ? '⏹️' : '🎤'}</Text>
+        </Pressable>
+        <Pressable
           onPress={() => send(input)}
           disabled={busy}
           accessibilityRole="button"
           accessibilityLabel="Send message"
           style={{
             minHeight: 64,
-            minWidth: 84,
+            minWidth: 76,
             marginLeft: 8,
             borderRadius: 16,
             alignItems: 'center',

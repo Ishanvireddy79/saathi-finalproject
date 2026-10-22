@@ -6,6 +6,7 @@ import { BigButton, Body, Card, Title } from '../ui';
 import Reminders from './Reminders';
 import CameraScreen from './CameraScreen';
 import SpeakScreen from './SpeakScreen';
+import CaptionsScreen from './CaptionsScreen';
 import {
   Appointment,
   Medicine,
@@ -24,6 +25,7 @@ export default function Dashboard() {
   const [open, setOpen] = useState(false);
   const [camOpen, setCamOpen] = useState(false);
   const [speakOpen, setSpeakOpen] = useState(false);
+  const [capOpen, setCapOpen] = useState(false);
   const [err, setErr] = useState('');
 
   const refresh = useCallback(() => {
@@ -100,9 +102,11 @@ export default function Dashboard() {
         </Card>
       )}
       {needs.includes('deaf') && (
-        <Card>
-          <Body>👂 Live captions and sound alerts. Coming soon.</Body>
-        </Card>
+                <Card>
+                <Body>👂 Live captions</Body>
+                <Body muted>Shows what people say as large text. Works offline once the language pack is installed. Sound alerts are coming later.</Body>
+                <BigButton label="Open captions" onPress={() => setCapOpen(true)} />
+              </Card>
       )}
       {needs.includes('speech') && (
         <Card>
@@ -119,6 +123,7 @@ export default function Dashboard() {
       <Reminders visible={open} onClose={closeReminders} />
       <CameraScreen visible={camOpen} onClose={() => setCamOpen(false)} />
       <SpeakScreen visible={speakOpen} onClose={() => setSpeakOpen(false)} />
+      <CaptionsScreen visible={capOpen} onClose={() => setCapOpen(false)} />
     </ScrollView>
   );
 }
