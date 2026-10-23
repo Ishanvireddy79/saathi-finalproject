@@ -1,11 +1,12 @@
 import React from 'react';
-import { Alert, ScrollView } from 'react-native';
+import { Alert, ScrollView, View } from 'react-native';
 import { colors } from '../theme';
 import { useProfile } from '../ProfileContext';
 import { BigButton, Body, Card, Option, Title } from '../ui';
 import { Lang, Need, TextSize } from '../storage';
 import Contacts from './Contacts';
 import SosGuide from './SosGuide';
+import { MedicalIdEditor } from './MedicalId';
 
 const LANGS: { id: Lang; label: string }[] = [
   { id: 'en', label: 'English' },
@@ -24,6 +25,11 @@ const SIZES: { id: TextSize; label: string }[] = [
   { id: 'large', label: 'Large' },
   { id: 'xlarge', label: 'Extra large' },
 ];
+
+// Empty space that screen readers skip.
+function Gap() {
+  return <View style={{ height: 20 }} />;
+}
 
 export default function Settings() {
   const { profile, update, reset } = useProfile();
@@ -63,7 +69,7 @@ export default function Settings() {
       ))}
       <Body muted>The app will speak your language fully in a later step.</Body>
 
-      <Body>{' '}</Body>
+      <Gap />
       <Body>Text size</Body>
       {SIZES.map((s) => (
         <Option
@@ -74,7 +80,7 @@ export default function Settings() {
         />
       ))}
 
-      <Body>{' '}</Body>
+      <Gap />
       <Body>How can Saathi help?</Body>
       {NEEDS.map((n) => (
         <Option
@@ -85,15 +91,19 @@ export default function Settings() {
           onPress={() => toggleNeed(n.id)}
         />
       ))}
-            <Body>{' '}</Body>
+
+      <Gap />
+      <MedicalIdEditor />
+
+      <Gap />
       <Contacts />
 
-      <Body>{' '}</Body>
+      <Gap />
       <SosGuide />
 
-      <Body>{' '}</Body>
-      <Card>       
-         <Body>
+      <Gap />
+      <Card>
+        <Body>
           Privacy: everything you enter stays on this phone. The only exception is the words you type
           to the assistant when you turn Online help on. Those are sent to a free AI service to get an
           answer. Your medicines, appointments, contacts and location are never sent.

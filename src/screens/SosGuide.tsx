@@ -1,7 +1,11 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 import { colors } from '../theme';
 import { Body, Card } from '../ui';
+
+function Gap() {
+  return <View style={{ height: 12 }} />;
+}
 
 export default function SosGuide() {
   return (
@@ -11,7 +15,7 @@ export default function SosGuide() {
         Your phone has its own emergency feature that works even when Saathi is closed. Saathi cannot
         press your phone's buttons for you, so please turn it on in your phone's settings.
       </Body>
-      <Body>{' '}</Body>
+      <Gap />
       {Platform.OS === 'ios' ? (
         <Body>
           iPhone: open Settings, then Emergency SOS. Turn on the side button option. Then press the side
@@ -24,7 +28,7 @@ export default function SosGuide() {
           The steps and the number of presses can differ by phone brand.
         </Body>
       )}
-      <Body>{' '}</Body>
+      <Gap />
       <Body muted>Please test it once, so you know how it works before you need it.</Body>
     </Card>
   );

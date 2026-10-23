@@ -74,31 +74,37 @@ function CameraInner({ onClose }: { onClose: () => void }) {
     setDebug('');
   };
 
+  // Takes a photo and returns its file path.
+  const capture = async (): Promise<string> => {
+    const photo = await (photoOutput as any).capturePhoto({}, {});
+    try {
+      const path = await photo.saveToTemporaryFileAsync();
+      return path.startsWith('file://') ? path : 'file://' + path;
+    } finally {
+      photo.dispose();
+    }
+  };
+
   const takePhoto = async () => {
     try {
       stopSpeaking();
       setStatus('Taking photo...');
-      const photo = await (photoOutput as any).capturePhoto({}, {});
-      try {
-        const path = await photo.saveToTemporaryFileAsync();
-        setUri(path.startsWith('file://') ? path : 'file://' + path);
-        clearResults();
-        setStatus('Photo taken.');
-      } finally {
-        photo.dispose();
-      }
+      const path = await capture();
+      setUri(path);
+      clearResults();
+      setStatus('Photo taken.');
     } catch (e: any) {
       setStatus('Could not take photo: ' + (e?.message ?? String(e)));
     }
   };
 
-  const readText = async () => {
+  const readText = async (photoUri: string = uri) => {
     try {
       setBusy(true);
       stopSpeaking();
       clearResults();
       setStatus('Reading the text...');
-      const result = await TextRecognition.recognize(uri);
+      const result = await TextRecognition.recognize(photoUri);
       const t = (result?.text ?? '').trim();
       setText(t);
       if (t) {
@@ -112,6 +118,22 @@ function CameraInner({ onClose }: { onClose: () => void }) {
       setStatus('Could not read text: ' + (e?.message ?? String(e)));
     } finally {
       setBusy(false);
+    }
+  };
+
+  // One tap for people who cannot see the screen: take a photo, then read it aloud.
+  const snapAndRead = async () => {
+    try {
+      setBusy(true);
+      stopSpeaking();
+      setStatus('Taking photo...');
+      const path = await capture();
+      setUri(path);
+      await readText(path);
+    } catch (e: any) {
+      setBusy(false);
+      setStatus('Could not take photo: ' + (e?.message ?? String(e)));
+      speak('Could not take the photo. Please try again.');
     }
   };
 
@@ -163,7 +185,7 @@ function CameraInner({ onClose }: { onClose: () => void }) {
             style={{ height: 220, borderRadius: 16 }}
           />
           <BigButton label="What is around me?" onPress={lookAround} disabled={busy} />
-          <BigButton label="Read text" onPress={readText} disabled={busy} />
+          <BigButton label="Read text" onPress={() => readText()} disabled={busy} />
           {shown ? (
             <>
               <BigButton
@@ -205,7 +227,10 @@ function CameraInner({ onClose }: { onClose: () => void }) {
         </ScrollView>
       ) : (
         <View style={{ flex: 1 }}>
-          <View style={{ flex: 1, borderRadius: 16, overflow: 'hidden' }}>
+          <View
+            style={{ flex: 1, borderRadius: 16, overflow: 'hidden' }}
+            accessibilityLabel="Camera view"
+          >
             <Camera
               style={StyleSheet.absoluteFill}
               device={device}
@@ -213,7 +238,8 @@ function CameraInner({ onClose }: { onClose: () => void }) {
               outputs={[photoOutput]}
             />
           </View>
-          <BigButton label="Take photo" onPress={takePhoto} />
+          <BigButton label="Take photo and read it aloud" onPress={snapAndRead} disabled={busy} />
+          <BigButton label="Take photo" onPress={takePhoto} disabled={busy} />
         </View>
       )}
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, Text } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { colors } from '../theme';
 import { useProfile } from '../ProfileContext';
 import { BigButton, Body, Card, Title } from '../ui';
@@ -7,6 +7,7 @@ import Reminders from './Reminders';
 import CameraScreen from './CameraScreen';
 import SpeakScreen from './SpeakScreen';
 import CaptionsScreen from './CaptionsScreen';
+import MedicalIdView from './MedicalId';
 import {
   Appointment,
   Medicine,
@@ -26,6 +27,7 @@ export default function Dashboard() {
   const [camOpen, setCamOpen] = useState(false);
   const [speakOpen, setSpeakOpen] = useState(false);
   const [capOpen, setCapOpen] = useState(false);
+  const [medIdOpen, setMedIdOpen] = useState(false);
   const [err, setErr] = useState('');
 
   const refresh = useCallback(() => {
@@ -60,10 +62,16 @@ export default function Dashboard() {
     >
       <Title>Hello, friend</Title>
       <Body muted>Here is your home.</Body>
-      <Body>{' '}</Body>
+      <View style={{ height: 16 }} />
 
       <Card>
         <Body>🆘 In an emergency, tap the red SOS button at the bottom.</Body>
+      </Card>
+
+      <Card>
+        <Body>🩺 Medical ID</Body>
+        <Body muted>Your name, allergies and medicines, ready to show or read aloud to a helper.</Body>
+        <BigButton label="Show my Medical ID" onPress={() => setMedIdOpen(true)} />
       </Card>
 
       <Card>
@@ -77,7 +85,7 @@ export default function Dashboard() {
             </Body>
           ))
         )}
-        <Text style={{ height: 8 }} />
+        <View style={{ height: 8 }} />
         <Body>📅 Next appointments</Body>
         {appts.length === 0 ? (
           <Body muted>None yet.</Body>
@@ -102,11 +110,11 @@ export default function Dashboard() {
         </Card>
       )}
       {needs.includes('deaf') && (
-                <Card>
-                <Body>👂 Live captions</Body>
-                <Body muted>Shows what people say as large text. Works offline once the language pack is installed. Sound alerts are coming later.</Body>
-                <BigButton label="Open captions" onPress={() => setCapOpen(true)} />
-              </Card>
+        <Card>
+          <Body>👂 Live captions</Body>
+          <Body muted>Shows what people say as large text. Works offline once the language pack is installed. Sound alerts are coming later.</Body>
+          <BigButton label="Open captions" onPress={() => setCapOpen(true)} />
+        </Card>
       )}
       {needs.includes('speech') && (
         <Card>
@@ -124,6 +132,7 @@ export default function Dashboard() {
       <CameraScreen visible={camOpen} onClose={() => setCamOpen(false)} />
       <SpeakScreen visible={speakOpen} onClose={() => setSpeakOpen(false)} />
       <CaptionsScreen visible={capOpen} onClose={() => setCapOpen(false)} />
+      <MedicalIdView visible={medIdOpen} onClose={() => setMedIdOpen(false)} />
     </ScrollView>
   );
 }

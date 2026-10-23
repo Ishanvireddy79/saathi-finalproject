@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export type Phrase = { id: string; text: string };
 
 const KEY = 'saathi_phrases_v1';
+const FAV_KEY = 'saathi_phrase_favs_v1';
 
 const DEFAULTS = [
   'Hello.',
@@ -27,6 +28,64 @@ export async function loadPhrases(): Promise<Phrase[]> {
 export async function savePhrases(list: Phrase[]): Promise<void> {
   await AsyncStorage.setItem(KEY, JSON.stringify(list));
 }
+
+// Favorites are stored as a list of phrase ids.
+export async function loadFavs(): Promise<string[]> {
+  const raw = await AsyncStorage.getItem(FAV_KEY);
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? (v as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveFavs(ids: string[]): Promise<void> {
+  await AsyncStorage.setItem(FAV_KEY, JSON.stringify(ids));
+}
+
+// Ready-made phrases the user can speak straight away or add to their own list.
+// They are English; the "Speak in" setting translates them to Hindi or Telugu.
+export type SuggestedGroup = { id: string; title: string; items: string[] };
+
+export const SUGGESTED: SuggestedGroup[] = [
+  {
+    id: 'emergency',
+    title: 'Emergency',
+    items: [
+      'I need help.',
+      'Please call an ambulance.',
+      'Please call the police.',
+      'There is a fire.',
+      'I cannot speak. Please read my screen.',
+      'I am deaf. Please write or type.',
+      'I am blind. Please guide me.',
+    ],
+  },
+  {
+    id: 'medical',
+    title: 'Medical',
+    items: [
+      'I need a doctor.',
+      'I cannot breathe well.',
+      'I have an allergy. Please ask me before giving medicine.',
+      'Please call my family.',
+    ],
+  },
+  {
+    id: 'daily',
+    title: 'Daily needs',
+    items: [
+      'Where is the toilet?',
+      'Please say that again, slowly.',
+      'Please wait a moment.',
+      'How much does this cost?',
+      'Please help me cross the road.',
+      'Which bus goes to this place?',
+    ],
+  },
+];
 
 export type Tile = { id: string; icon: string; label: string; say: string };
 
