@@ -1,38 +1,40 @@
-import React from 'react';
-import { Alert, ScrollView, View } from 'react-native';
-import { colors } from '../theme';
+import React, { useState } from 'react';
+import { Alert, Text, View, ScrollView } from 'react-native';
+import { colors, shadow } from '../theme';
 import { useProfile } from '../ProfileContext';
-import { BigButton, Body, Card, Option, Title } from '../ui';
+import {
+  Card,
+  ChoiceRow,
+  Group,
+  Row,
+  ScreenHeader,
+  SectionTitle,
+  SheetModal,
+  SwitchRow,
+  TOP_PAD,
+} from '../ui';
 import { Lang, Need, TextSize } from '../storage';
 import Contacts from './Contacts';
 import SosGuide from './SosGuide';
 import { MedicalIdEditor } from './MedicalId';
 
-const LANGS: { id: Lang; label: string }[] = [
-  { id: 'en', label: 'English' },
-  { id: 'hi', label: 'हिन्दी (Hindi)' },
-  { id: 'te', label: 'తెలుగు (Telugu)' },
+const LANGS: { id: Lang; label: string; native: string }[] = [
+  { id: 'en', label: 'English', native: 'English' },
+  { id: 'hi', label: 'Hindi', native: 'हिन्दी' },
+  { id: 'te', label: 'Telugu', native: 'తెలుగు' },
 ];
 
-const NEEDS: { id: Need; label: string }[] = [
-  { id: 'blind', label: 'Blind or low vision' },
-  { id: 'deaf', label: 'Deaf or hard of hearing' },
-  { id: 'speech', label: 'Difficulty speaking' },
+const SIZES: { id: TextSize; label: string; description: string }[] = [
+  { id: 'normal', label: 'Normal', description: 'The standard size' },
+  { id: 'large', label: 'Large', description: 'Easier to read' },
+  { id: 'xlarge', label: 'Extra large', description: 'The biggest text' },
 ];
 
-const SIZES: { id: TextSize; label: string }[] = [
-  { id: 'normal', label: 'Normal' },
-  { id: 'large', label: 'Large' },
-  { id: 'xlarge', label: 'Extra large' },
-];
-
-// Empty space that screen readers skip.
-function Gap() {
-  return <View style={{ height: 20 }} />;
-}
+type Sheet = 'language' | 'size' | 'medical' | 'contacts' | 'sos' | 'privacy' | null;
 
 export default function Settings() {
-  const { profile, update, reset } = useProfile();
+  const { profile, update, reset, fs } = useProfile();
+  const [sheet, setSheet] = useState<Sheet>(null);
 
   const toggleNeed = (n: Need) => {
     const cur = profile.needs;
@@ -50,72 +52,205 @@ export default function Settings() {
     );
   };
 
+  const lang = LANGS.find((l) => l.id === profile.language) ?? LANGS[0];
+  const size = SIZES.find((s) => s.id === profile.textSize) ?? SIZES[0];
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: 20, paddingTop: 56, paddingBottom: 200 }}
-      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={{ padding: 20, paddingTop: TOP_PAD, paddingBottom: 60 }}
     >
-      <Title>Settings</Title>
+      <ScreenHeader title="Settings" />
 
-      <Body>Language</Body>
-      {LANGS.map((l) => (
-        <Option
-          key={l.id}
-          label={l.label}
-          selected={profile.language === l.id}
-          onPress={() => update({ language: l.id })}
+      {/* Profile card */}
+      <View
+        style={{
+          backgroundColor: colors.accent,
+          borderRadius: 28,
+          padding: 22,
+          marginBottom: 22,
+          ...shadow,
+          shadowColor: colors.accent,
+          shadowOpacity: 0.3,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 18,
+              backgroundColor: 'rgba(255,255,255,0.18)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text style={{ fontSize: 28, fontWeight: '800', color: '#FFFFFF' }}>S</Text>
+          </View>
+          <View style={{ marginLeft: 14, flex: 1 }}>
+            <Text style={{ fontSize: fs(24), fontWeight: '800', letterSpacing: -0.4, color: '#FFFFFF' }}>
+              Saathi
+            </Text>
+            <Text style={{ fontSize: fs(14), color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>
+              Set up for the way you live
+            </Text>
+          </View>
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 16 }}>
+          {[lang.native, size.label + ' text'].map((t) => (
+            <View
+              key={t}
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 7,
+                borderRadius: 999,
+                backgroundColor: 'rgba(255,255,255,0.18)',
+                marginRight: 8,
+                marginBottom: 4,
+              }}
+            >
+              <Text style={{ fontSize: fs(13), fontWeight: '700', color: '#FFFFFF' }}>{t}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <SectionTitle>Preferences</SectionTitle>
+      <Group>
+        <Row icon="globe-outline" title="Language" value={lang.native} onPress={() => setSheet('language')} />
+        <Row icon="text-outline" title="Text size" value={size.label} onPress={() => setSheet('size')} last />
+      </Group>
+
+      <SectionTitle>How Saathi helps me</SectionTitle>
+      <Group>
+        <SwitchRow
+          icon="eye-outline"
+          tone="sage"
+          title="Blind or low vision"
+          description="Camera that reads text aloud"
+          value={profile.needs.includes('blind')}
+          onChange={() => toggleNeed('blind')}
         />
-      ))}
-      <Body muted>The app will speak your language fully in a later step.</Body>
-
-      <Gap />
-      <Body>Text size</Body>
-      {SIZES.map((s) => (
-        <Option
-          key={s.id}
-          label={s.label}
-          selected={profile.textSize === s.id}
-          onPress={() => update({ textSize: s.id })}
+        <SwitchRow
+          icon="ear-outline"
+          tone="amber"
+          title="Deaf or hard of hearing"
+          description="Live captions of speech"
+          value={profile.needs.includes('deaf')}
+          onChange={() => toggleNeed('deaf')}
         />
-      ))}
-
-      <Gap />
-      <Body>How can Saathi help?</Body>
-      {NEEDS.map((n) => (
-        <Option
-          key={n.id}
-          role="checkbox"
-          label={n.label}
-          selected={profile.needs.includes(n.id)}
-          onPress={() => toggleNeed(n.id)}
+        <SwitchRow
+          icon="chatbubble-ellipses-outline"
+          tone="accent"
+          title="Difficulty speaking"
+          description="Phrases and pictures that speak for me"
+          value={profile.needs.includes('speech')}
+          onChange={() => toggleNeed('speech')}
+          last
         />
-      ))}
+      </Group>
 
-      <Gap />
-      <MedicalIdEditor />
+      <SectionTitle>Safety</SectionTitle>
+      <Group>
+        <Row icon="medkit-outline" tone="sos" title="Medical ID" onPress={() => setSheet('medical')} />
+        <Row icon="people-outline" tone="sage" title="Emergency contacts" onPress={() => setSheet('contacts')} />
+        <Row
+          icon="shield-checkmark-outline"
+          tone="amber"
+          title="Phone emergency feature"
+          onPress={() => setSheet('sos')}
+          last
+        />
+      </Group>
 
-      <Gap />
-      <Contacts />
+      <SectionTitle>About</SectionTitle>
+      <Group>
+        <Row icon="lock-closed-outline" title="Privacy and about" onPress={() => setSheet('privacy')} last />
+      </Group>
 
-      <Gap />
-      <SosGuide />
+      <Group>
+        <Row icon="trash-outline" title="Reset app data" danger onPress={confirmReset} last />
+      </Group>
 
-      <Gap />
-      <Card>
-        <Body>
-          Privacy: everything you enter stays on this phone. The only exception is the words you type
-          to the assistant when you turn Online help on. Those are sent to a free AI service to get an
-          answer. Your medicines, appointments, contacts and location are never sent.
-        </Body>
-      </Card>
-      <Card style={{ backgroundColor: colors.sageSoft }}>
-        <Body>
-          About: Saathi is an assistive aid. It does not replace a cane, a guide or a doctor.
-        </Body>
-      </Card>
+      <Text style={{ fontSize: fs(13), color: colors.muted, textAlign: 'center', marginTop: 4 }}>
+        Saathi 1.0.0
+      </Text>
 
-      <BigButton label="Reset app data" onPress={confirmReset} />
+      {/* Sub-pages */}
+      <SheetModal visible={sheet === 'language'} title="Language" onClose={() => setSheet(null)}>
+        <Group>
+          {LANGS.map((l, i) => (
+            <ChoiceRow
+              key={l.id}
+              title={l.native}
+              description={l.id === 'en' ? undefined : l.label}
+              selected={profile.language === l.id}
+              last={i === LANGS.length - 1}
+              onPress={() => {
+                update({ language: l.id });
+                setSheet(null);
+              }}
+            />
+          ))}
+        </Group>
+        <Text style={{ fontSize: fs(14), color: colors.muted, lineHeight: fs(21) }}>
+          This sets your voice and captions language. The app will speak your language fully in a later step.
+        </Text>
+      </SheetModal>
+
+      <SheetModal visible={sheet === 'size'} title="Text size" onClose={() => setSheet(null)}>
+        <Group>
+          {SIZES.map((s, i) => (
+            <ChoiceRow
+              key={s.id}
+              title={s.label}
+              description={s.description}
+              selected={profile.textSize === s.id}
+              last={i === SIZES.length - 1}
+              onPress={() => update({ textSize: s.id })}
+            />
+          ))}
+        </Group>
+        <Card>
+          <Text style={{ fontSize: fs(14), color: colors.muted }}>Preview</Text>
+          <Text style={{ fontSize: fs(20), color: colors.text, lineHeight: fs(28), marginTop: 6 }}>
+            This is how your text will look.
+          </Text>
+        </Card>
+      </SheetModal>
+
+      <SheetModal visible={sheet === 'medical'} title="Medical ID" onClose={() => setSheet(null)}>
+        <Card>
+          <MedicalIdEditor />
+        </Card>
+      </SheetModal>
+
+      <SheetModal visible={sheet === 'contacts'} title="Emergency contacts" onClose={() => setSheet(null)}>
+        <Card>
+          <Contacts />
+        </Card>
+      </SheetModal>
+
+      <SheetModal visible={sheet === 'sos'} title="Phone emergency feature" onClose={() => setSheet(null)}>
+        <SosGuide />
+      </SheetModal>
+
+      <SheetModal visible={sheet === 'privacy'} title="Privacy and about" onClose={() => setSheet(null)}>
+        <Card>
+          <Text style={{ fontSize: fs(16), color: colors.text, lineHeight: fs(25) }}>
+            Everything you enter stays on this phone. The only exception is the words you type to the
+            assistant when you turn Online help on. Those are sent to a free AI service to get an answer.
+            Your medicines, appointments, contacts and location are never sent.
+          </Text>
+        </Card>
+        <Card style={{ backgroundColor: colors.accentSoft }}>
+          <Text style={{ fontSize: fs(16), color: colors.text, lineHeight: fs(25) }}>
+            Saathi is an assistive aid. It does not replace a cane, a guide or a doctor.
+          </Text>
+        </Card>
+      </SheetModal>
     </ScrollView>
   );
 }

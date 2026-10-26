@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, ScrollView, Text, TextInput, View } from 'react-native';
+import { Linking, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import * as Speech from 'expo-speech';
-import { colors } from '../theme';
+import { colors, shadow } from '../theme';
 import { useProfile } from '../ProfileContext';
-import { BigButton, Body, Card, Title } from '../ui';
+import { Avatar, Backdrop, BigButton, Body, Card, Chip, TOP_PAD } from '../ui';
 import { Contact, loadContacts } from '../contacts';
 import { voiceLanguage } from '../phrases';
 import {
@@ -92,7 +92,7 @@ export function MedicalIdEditor() {
   );
 }
 
-// Full-screen large view for a helper, with a read-aloud button.
+// Full-screen profile for a helper, with a read-aloud button.
 export default function MedicalIdView({
   visible,
   onClose,
@@ -137,37 +137,118 @@ export default function MedicalIdView({
     }
   };
 
+  const call = (c: Contact) => {
+    Linking.openURL('tel:' + c.phone).catch(() => setStatus('Could not open the phone dialer.'));
+  };
+
   const empty = isEmptyMedicalId(data);
+  const name = data.name.trim();
+  const sections = FIELDS.filter((f) => f.key !== 'name' && f.key !== 'bloodGroup' && data[f.key].trim());
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={close}>
       <ScrollView
         style={{ flex: 1, backgroundColor: colors.bg }}
-        contentContainerStyle={{ padding: 24, paddingTop: 56, paddingBottom: 60 }}
+        contentContainerStyle={{ padding: 20, paddingTop: TOP_PAD, paddingBottom: 60 }}
       >
-        <Title>Medical ID</Title>
+        <Backdrop />
+
+        <Pressable
+          onPress={close}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          hitSlop={8}
+          style={{
+            alignSelf: 'flex-start',
+            minHeight: 48,
+            paddingHorizontal: 18,
+            borderRadius: 24,
+            justifyContent: 'center',
+            backgroundColor: colors.card,
+            marginBottom: 16,
+            ...shadow,
+          }}
+        >
+          <Text style={{ fontSize: fs(16), fontWeight: '700', color: colors.accent }}>‹ Back</Text>
+        </Pressable>
+
+        <Card style={{ alignItems: 'center', paddingVertical: 28 }}>
+          <Avatar label={name ? name.charAt(0).toUpperCase() : '🩺'} tone="sos" size={96} />
+          <Text
+            accessibilityRole="header"
+            selectable
+            style={{
+              fontSize: fs(28),
+              fontWeight: '800',
+              letterSpacing: -0.4,
+              color: colors.text,
+              marginTop: 14,
+              textAlign: 'center',
+            }}
+          >
+            {name || 'Medical ID'}
+          </Text>
+          <Text style={{ fontSize: fs(15), color: colors.muted, marginTop: 2 }}>Medical ID</Text>
+          {data.bloodGroup.trim() ? (
+            <View style={{ marginTop: 12 }}>
+              <Chip label={'Blood group ' + data.bloodGroup.trim()} tone="sos" />
+            </View>
+          ) : null}
+        </Card>
+
         {empty ? (
           <Body muted>No Medical ID yet. You can add one in Settings.</Body>
         ) : (
-          FIELDS.filter((f) => data[f.key].trim()).map((f) => (
+          sections.map((f) => (
             <Card key={f.key}>
-              <Text style={{ fontSize: fs(16), color: colors.muted }}>{f.label}</Text>
-              <Text selectable style={{ fontSize: fs(26), lineHeight: fs(34), color: colors.text, marginTop: 4 }}>
+              <Text style={{ fontSize: fs(14), fontWeight: '800', color: colors.muted, letterSpacing: 0.5 }}>
+                {f.label.toUpperCase()}
+              </Text>
+              <Text selectable style={{ fontSize: fs(22), lineHeight: fs(30), color: colors.text, marginTop: 6 }}>
                 {data[f.key]}
               </Text>
             </Card>
           ))
         )}
+
         {contacts.length > 0 ? (
           <Card>
-            <Text style={{ fontSize: fs(16), color: colors.muted }}>Emergency contacts</Text>
+            <Text style={{ fontSize: fs(14), fontWeight: '800', color: colors.muted, letterSpacing: 0.5 }}>
+              EMERGENCY CONTACTS
+            </Text>
             {contacts.map((c) => (
-              <Text key={c.id} selectable style={{ fontSize: fs(24), lineHeight: fs(32), color: colors.text, marginTop: 4 }}>
-                {c.name + ': ' + c.phone}
-              </Text>
+              <View
+                key={c.id}
+                style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text selectable style={{ fontSize: fs(20), fontWeight: '700', color: colors.text }}>
+                    {c.name}
+                  </Text>
+                  <Text selectable style={{ fontSize: fs(16), color: colors.muted }}>
+                    {c.phone}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => call(c)}
+                  accessibilityRole="button"
+                  accessibilityLabel={'Call ' + c.name}
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 28,
+                    backgroundColor: colors.sage,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 24 }}>📞</Text>
+                </Pressable>
+              </View>
             ))}
           </Card>
         ) : null}
+
         {!empty || contacts.length > 0 ? <BigButton label="Read aloud" onPress={readAloud} /> : null}
         {status ? (
           <Text accessibilityLiveRegion="polite" style={{ fontSize: fs(17), color: colors.accent, marginTop: 8 }}>

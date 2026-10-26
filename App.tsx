@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StatusBar, Text, View } from 'react-native';
-import { colors } from './src/theme';
+import { colors, shadow } from './src/theme';
+import { Glyph } from './src/ui';
 import { ProfileProvider, useProfile } from './src/ProfileContext';
 import { ErrorBoundary } from './src/ErrorBoundary';
 import Onboarding from './src/screens/Onboarding';
@@ -14,10 +15,10 @@ import { useSosShortcut } from './src/shortcuts';
 type Tab = 'home' | 'assistant' | 'learn' | 'settings';
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'home', label: 'Home', icon: '🏠' },
-  { id: 'assistant', label: 'Assistant', icon: '💬' },
-  { id: 'learn', label: 'Learn', icon: '📖' },
-  { id: 'settings', label: 'Settings', icon: '⚙️' },
+  { id: 'home', label: 'Home', icon: 'home' },
+  { id: 'assistant', label: 'Assistant', icon: 'chatbubble-ellipses' },
+  { id: 'learn', label: 'Learn', icon: 'school' },
+  { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
 function TabButton({ tab, active, onPress }: { tab: (typeof TABS)[number]; active: boolean; onPress: () => void }) {
@@ -28,14 +29,30 @@ function TabButton({ tab, active, onPress }: { tab: (typeof TABS)[number]; activ
       accessibilityRole="tab"
       accessibilityLabel={tab.label}
       accessibilityState={{ selected: active }}
-      style={{ flex: 1, minHeight: 64, alignItems: 'center', justifyContent: 'center' }}
+      style={{ flex: 1, minHeight: 68, alignItems: 'center', justifyContent: 'center' }}
     >
-      <Text style={{ fontSize: 22 }}>{tab.icon}</Text>
+      <View
+        style={{
+          width: 56,
+          height: 32,
+          borderRadius: 16,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: active ? colors.accentSoft : 'transparent',
+        }}
+      >
+        <Glyph
+          icon={active ? tab.icon : tab.icon + '-outline'}
+          color={active ? colors.accent : colors.muted}
+          size={24}
+        />
+      </View>
       <Text
         style={{
           fontSize: Math.min(fs(12), 16),
+          marginTop: 2,
           color: active ? colors.accent : colors.muted,
-          fontWeight: active ? 'bold' : 'normal',
+          fontWeight: active ? '800' : '500',
         }}
       >
         {tab.label}
@@ -50,19 +67,24 @@ function SosButton({ onPress }: { onPress: () => void }) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="SOS emergency help"
-      style={{
+      style={({ pressed }) => ({
         width: 76,
         height: 76,
         borderRadius: 38,
         backgroundColor: colors.sos,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: -24,
-        borderWidth: 4,
-        borderColor: colors.bg,
-      }}
+        marginTop: -28,
+        borderWidth: 5,
+        borderColor: colors.card,
+        transform: [{ scale: pressed ? 0.95 : 1 }],
+        ...shadow,
+        shadowColor: colors.sos,
+        shadowOpacity: 0.4,
+        elevation: 8,
+      })}
     >
-      <Text style={{ color: colors.sosText, fontSize: 22, fontWeight: 'bold' }}>SOS</Text>
+      <Text style={{ color: colors.sosText, fontSize: 22, fontWeight: '800' }}>SOS</Text>
     </Pressable>
   );
 }
@@ -73,7 +95,7 @@ function Shell() {
   const [sosOpen, setSosOpen] = useState(false);
   useSosShortcut(() => setSosOpen(true));
 
-  let screen: React.ReactNode = <Dashboard />;
+  let screen: React.ReactNode = <Dashboard onNavigate={setTab} />;
   if (tab === 'assistant') screen = <Assistant />;
   if (tab === 'learn') screen = <Learn />;
   if (tab === 'settings') screen = <Settings />;
@@ -98,9 +120,13 @@ function Shell() {
           flexDirection: 'row',
           alignItems: 'center',
           backgroundColor: colors.card,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-          paddingBottom: 24,
+          marginHorizontal: 14,
+          marginBottom: 20,
+          borderRadius: 32,
+          paddingVertical: 4,
+          ...shadow,
+          shadowOpacity: 0.14,
+          elevation: 10,
         }}
       >
         {left.map((t) => (

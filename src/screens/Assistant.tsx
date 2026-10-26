@@ -5,9 +5,9 @@ import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
 } from 'expo-speech-recognition';
-import { colors } from '../theme';
+import { colors, shadow } from '../theme';
 import { useProfile } from '../ProfileContext';
-import { Title } from '../ui';
+import { Glyph, IconBadge, TOP_PAD } from '../ui';
 import { AgentAction, SUGGESTIONS, respond } from '../agent';
 import { askOnline, isOnlineEnabled, setOnlineEnabled } from '../online';
 import { voiceLanguage } from '../phrases';
@@ -140,7 +140,11 @@ export default function Assistant() {
       setBusy(false);
     }
   };
-  sendRef.current = send;
+
+  // Keep the latest send function available to the microphone callback.
+  useEffect(() => {
+    sendRef.current = send;
+  });
 
   const speechLang =
     profile.language === 'hi' ? 'hi-IN' : profile.language === 'te' ? 'te-IN' : 'en-IN';
@@ -236,25 +240,39 @@ export default function Assistant() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: 56 }}>
-      <View style={{ paddingHorizontal: 20 }}>
-        <Title>Assistant</Title>
-        <Text style={{ fontSize: fs(15), color: colors.sage, marginTop: -6, marginBottom: 6 }}>
-          {online
-            ? 'Online help is on. Offline features still work.'
-            : 'Offline mode. Works without internet.'}
-        </Text>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      {/* Header */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 20,
+          paddingTop: TOP_PAD,
+          paddingBottom: 12,
+        }}
+      >
+        <IconBadge icon="💬" tone="accent" size={48} />
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <Text
+            accessibilityRole="header"
+            style={{ fontSize: fs(26), fontWeight: '800', letterSpacing: -0.4, color: colors.text }}
+          >
+            Saathi
+          </Text>
+          <Text style={{ fontSize: fs(14), color: online ? colors.sage : colors.muted }}>
+            {online ? 'Online help is on' : 'Offline mode. Works without internet'}
+          </Text>
+        </View>
         <Pressable
           onPress={toggleOnline}
           accessibilityRole="switch"
           accessibilityLabel="Online help"
           accessibilityState={{ checked: online }}
           style={{
-            minHeight: 64,
-            borderRadius: 16,
-            justifyContent: 'center',
+            minHeight: 48,
             paddingHorizontal: 16,
-            marginBottom: 6,
+            borderRadius: 24,
+            justifyContent: 'center',
             backgroundColor: online ? colors.sage : colors.card,
             borderWidth: 1.5,
             borderColor: online ? colors.sage : colors.border,
@@ -262,16 +280,17 @@ export default function Assistant() {
         >
           <Text
             style={{
-              fontSize: fs(17),
-              fontWeight: 'bold',
+              fontSize: fs(15),
+              fontWeight: '700',
               color: online ? colors.accentText : colors.text,
             }}
           >
-            {online ? 'Online help: ON. Tap to turn off.' : 'Online help: OFF. Tap to turn on.'}
+            {online ? 'Online: ON' : 'Online: OFF'}
           </Text>
         </Pressable>
       </View>
 
+      {/* Conversation */}
       <ScrollView
         ref={scrollRef}
         style={{ flex: 1 }}
@@ -279,63 +298,70 @@ export default function Assistant() {
         keyboardShouldPersistTaps="handled"
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
       >
-        {msgs.map((m) => (
-          <View
-            key={m.id}
-            style={{ alignItems: m.from === 'me' ? 'flex-end' : 'flex-start', marginBottom: 10 }}
-          >
+        {msgs.map((m) => {
+          const mine = m.from === 'me';
+          return (
             <View
-              style={{
-                maxWidth: '88%',
-                backgroundColor: m.from === 'me' ? colors.accent : colors.card,
-                borderColor: colors.border,
-                borderWidth: m.from === 'me' ? 0 : 1,
-                borderRadius: 18,
-                padding: 14,
-              }}
+              key={m.id}
+              style={{ alignItems: mine ? 'flex-end' : 'flex-start', marginBottom: 12 }}
             >
-              <Text
-                selectable
+              <View
                 style={{
-                  fontSize: fs(18),
-                  lineHeight: fs(26),
-                  color: m.from === 'me' ? colors.accentText : colors.text,
+                  maxWidth: '88%',
+                  backgroundColor: mine ? colors.accent : colors.card,
+                  borderRadius: 24,
+                  borderBottomRightRadius: mine ? 6 : 24,
+                  borderBottomLeftRadius: mine ? 24 : 6,
+                  paddingHorizontal: 18,
+                  paddingVertical: 14,
+                  ...(mine ? {} : shadow),
                 }}
               >
-                {m.text}
-              </Text>
-              {m.online ? (
-                <Text style={{ fontSize: fs(13), color: colors.muted, marginTop: 6 }}>
-                  Online answer. It can contain mistakes.
+                <Text
+                  selectable
+                  style={{
+                    fontSize: fs(18),
+                    lineHeight: fs(26),
+                    color: mine ? colors.accentText : colors.text,
+                  }}
+                >
+                  {m.text}
                 </Text>
+                {m.online ? (
+                  <Text style={{ fontSize: fs(13), color: colors.muted, marginTop: 6 }}>
+                    Online answer. It can contain mistakes.
+                  </Text>
+                ) : null}
+              </View>
+              {m.action ? (
+                <Pressable
+                  onPress={() => openAction(m.action as AgentAction)}
+                  accessibilityRole="button"
+                  accessibilityLabel={ACTION_LABEL[m.action]}
+                  style={({ pressed }) => ({
+                    minHeight: 56,
+                    marginTop: 8,
+                    paddingHorizontal: 22,
+                    borderRadius: 28,
+                    justifyContent: 'center',
+                    backgroundColor: m.action === 'sos' ? colors.sos : colors.sage,
+                    opacity: pressed ? 0.85 : 1,
+                  })}
+                >
+                  <Text style={{ fontSize: fs(17), fontWeight: '700', color: '#FFFFFF' }}>
+                    {ACTION_LABEL[m.action]}
+                  </Text>
+                </Pressable>
               ) : null}
             </View>
-            {m.action ? (
-              <Pressable
-                onPress={() => openAction(m.action as AgentAction)}
-                accessibilityRole="button"
-                accessibilityLabel={ACTION_LABEL[m.action]}
-                style={{
-                  minHeight: 64,
-                  marginTop: 6,
-                  paddingHorizontal: 20,
-                  borderRadius: 16,
-                  justifyContent: 'center',
-                  backgroundColor: m.action === 'sos' ? colors.sos : colors.sage,
-                }}
-              >
-                <Text style={{ fontSize: fs(18), fontWeight: 'bold', color: '#FFFFFF' }}>
-                  {ACTION_LABEL[m.action]}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-        ))}
+          );
+        })}
         {busy ? (
           <Text style={{ fontSize: fs(16), color: colors.muted, marginLeft: 6 }}>Thinking...</Text>
         ) : null}
       </ScrollView>
 
+      {/* Suggestions */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -349,18 +375,18 @@ export default function Assistant() {
             onPress={() => send(s)}
             accessibilityRole="button"
             accessibilityLabel={s}
-            style={{
-              minHeight: 64,
+            style={({ pressed }) => ({
+              minHeight: 48,
               marginHorizontal: 4,
-              paddingHorizontal: 16,
-              borderRadius: 16,
+              paddingHorizontal: 18,
+              borderRadius: 24,
               justifyContent: 'center',
-              backgroundColor: colors.sageSoft,
+              backgroundColor: pressed ? colors.accentSoft : colors.card,
               borderWidth: 1,
               borderColor: colors.border,
-            }}
+            })}
           >
-            <Text style={{ fontSize: fs(16), color: colors.text }}>{s}</Text>
+            <Text style={{ fontSize: fs(15), fontWeight: '600', color: colors.accent }}>{s}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -368,13 +394,26 @@ export default function Assistant() {
       {micNote || listening ? (
         <Text
           accessibilityLiveRegion="polite"
-          style={{ fontSize: fs(15), color: colors.accent, paddingHorizontal: 16, paddingBottom: 4 }}
+          style={{ fontSize: fs(15), color: colors.accent, paddingHorizontal: 20, paddingTop: 4 }}
         >
           {listening ? 'Listening... speak now. Tap the microphone again to stop.' : micNote}
         </Text>
       ) : null}
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 8 }}>
+      {/* Composer */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginHorizontal: 12,
+          marginTop: 6,
+          marginBottom: 6,
+          padding: 6,
+          backgroundColor: colors.card,
+          borderRadius: 34,
+          ...shadow,
+        }}
+      >
         <TextInput
           value={input}
           onChangeText={setInput}
@@ -385,11 +424,7 @@ export default function Assistant() {
           accessibilityLabel="Type your message"
           style={{
             flex: 1,
-            minHeight: 64,
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            borderRadius: 16,
-            backgroundColor: colors.card,
+            minHeight: 56,
             paddingHorizontal: 16,
             fontSize: fs(19),
             color: colors.text,
@@ -401,16 +436,15 @@ export default function Assistant() {
           accessibilityLabel={listening ? 'Stop listening' : 'Speak to Saathi'}
           accessibilityState={{ selected: listening }}
           style={{
-            minHeight: 64,
-            minWidth: 64,
-            marginLeft: 8,
-            borderRadius: 16,
+            width: 56,
+            height: 56,
+            borderRadius: 28,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: listening ? colors.sos : colors.sage,
+            backgroundColor: listening ? colors.sos : colors.sageSoft,
           }}
         >
-          <Text style={{ fontSize: 26 }}>{listening ? '⏹️' : '🎤'}</Text>
+          <Glyph icon={listening ? 'stop' : 'mic'} color={listening ? colors.sosText : colors.sage} size={26} />
         </Pressable>
         <Pressable
           onPress={() => send(input)}
@@ -418,17 +452,17 @@ export default function Assistant() {
           accessibilityRole="button"
           accessibilityLabel="Send message"
           style={{
-            minHeight: 64,
-            minWidth: 76,
-            marginLeft: 8,
-            borderRadius: 16,
+            width: 56,
+            height: 56,
+            marginLeft: 6,
+            borderRadius: 28,
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: colors.accent,
             opacity: busy ? 0.5 : 1,
           }}
         >
-          <Text style={{ fontSize: fs(18), fontWeight: 'bold', color: colors.accentText }}>Send</Text>
+          <Glyph icon="arrow-up" color={colors.accentText} size={26} />
         </Pressable>
       </View>
 
@@ -446,10 +480,10 @@ export default function Assistant() {
         accessibilityRole="switch"
         accessibilityLabel="Speak replies aloud"
         accessibilityState={{ checked: speakOn }}
-        style={{ minHeight: 64, justifyContent: 'center', paddingHorizontal: 20 }}
+        style={{ minHeight: 48, justifyContent: 'center', paddingHorizontal: 24 }}
       >
-        <Text style={{ fontSize: fs(16), color: colors.muted }}>
-          {speakOn ? 'Replies are spoken aloud. Tap to turn off.' : 'Replies are silent. Tap to turn on.'}
+        <Text style={{ fontSize: fs(14), color: colors.muted }}>
+          {speakOn ? '🔊 Replies are spoken aloud. Tap to turn off.' : '🔇 Replies are silent. Tap to turn on.'}
         </Text>
       </Pressable>
 
