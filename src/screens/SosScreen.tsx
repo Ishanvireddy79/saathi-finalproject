@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, ScrollView, Text, View } from 'react-native';
+import { Modal, ScrollView, Text } from 'react-native';
 import { colors } from '../theme';
 import { useProfile } from '../ProfileContext';
-import { BigButton, Body, Title } from '../ui';
+import { ActionRow, BigButton, ScreenHeader, TOP_PAD } from '../ui';
 import { Contact, loadContacts } from '../contacts';
 import { callEmergency, sendEmergencySms } from '../sos';
 import MedicalIdView from './MedicalId';
@@ -10,9 +10,11 @@ import MedicalIdView from './MedicalId';
 export default function SosScreen({
   visible,
   onClose,
+  hideMedicalId,
 }: {
   visible: boolean;
   onClose: () => void;
+  hideMedicalId?: boolean;
 }) {
   const { fs } = useProfile();
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -35,41 +37,50 @@ export default function SosScreen({
     <Modal visible={visible} animationType="slide" onRequestClose={close}>
       <ScrollView
         style={{ flex: 1, backgroundColor: colors.bg }}
-        contentContainerStyle={{ padding: 24, paddingTop: 64, paddingBottom: 48 }}
+        contentContainerStyle={{ padding: 20, paddingTop: TOP_PAD, paddingBottom: 48 }}
       >
-        <Title>Emergency help</Title>
-        <Body>Stay calm. Choose what you need.</Body>
-        <View style={{ height: 16 }} />
+        <ScreenHeader title="Emergency help" subtitle="Stay calm. Choose what you need." />
 
-        <BigButton
-          label="Call 112"
+        <ActionRow
+          solid
+          icon="📞"
+          title="Call 112"
+          subtitle="Opens the phone dialer"
           onPress={async () => setStatus(await callEmergency())}
         />
-        <BigButton
-          label="Send message to my contacts"
+        <ActionRow
+          icon="💬"
+          tone="accent"
+          title="Message my contacts"
+          subtitle={
+            contacts.length === 0
+              ? 'No contacts yet. Add them in Settings.'
+              : contacts.map((c) => c.name).join(', ')
+          }
           onPress={async () => setStatus(await sendEmergencySms(contacts))}
         />
-        <BigButton label="Show my Medical ID" onPress={() => setMedOpen(true)} />
-        <View style={{ height: 8 }} />
-        <Body muted>
-          {contacts.length === 0
-            ? 'You have no emergency contacts. Add them in Settings.'
-            : 'Contacts: ' + contacts.map((c) => c.name).join(', ')}
-        </Body>
+        {hideMedicalId ? null : (
+          <ActionRow
+            icon="🩺"
+            tone="sos"
+            title="Show my Medical ID"
+            subtitle="For a helper to read"
+            onPress={() => setMedOpen(true)}
+          />
+        )}
 
         {status ? (
           <Text
             accessibilityLiveRegion="polite"
-            style={{ fontSize: fs(18), color: colors.accent, marginTop: 16 }}
+            style={{ fontSize: fs(18), color: colors.accent, marginTop: 8 }}
           >
             {status}
           </Text>
         ) : null}
 
-        <View style={{ height: 16 }} />
-        <Body muted>
+        <Text style={{ fontSize: fs(15), color: colors.muted, lineHeight: fs(22), marginTop: 12 }}>
           The phone opens the dialer or messages for you. You must press call or send yourself.
-        </Body>
+        </Text>
         <BigButton label="Close" onPress={close} />
       </ScrollView>
       <MedicalIdView visible={medOpen} onClose={() => setMedOpen(false)} />

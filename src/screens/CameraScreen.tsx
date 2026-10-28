@@ -8,10 +8,10 @@ import {
 } from 'react-native-vision-camera';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
 import * as Speech from 'expo-speech';
-import { colors } from '../theme';
+import { colors, shadow } from '../theme';
 import { useProfile } from '../ProfileContext';
 import { ErrorBoundary } from '../ErrorBoundary';
-import { BigButton, Body, Card, Title } from '../ui';
+import { ActionRow, BigButton, Card, IconBadge, TOP_PAD, TopBar } from '../ui';
 import { describeSurroundings } from '../detect';
 
 function CameraInner({ onClose }: { onClose: () => void }) {
@@ -165,56 +165,124 @@ function CameraInner({ onClose }: { onClose: () => void }) {
 
   const shown = seen || text;
 
+  const statusPill = status ? (
+    <View
+      style={{
+        backgroundColor: colors.accentSoft,
+        borderRadius: 18,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        marginTop: 12,
+      }}
+    >
+      <Text accessibilityLiveRegion="polite" style={{ fontSize: fs(16), color: colors.accent, fontWeight: '600' }}>
+        {status}
+      </Text>
+    </View>
+  ) : null;
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, padding: 20, paddingTop: 56 }}>
-      <Title>Camera</Title>
+    <View style={{ flex: 1, backgroundColor: colors.bg, paddingHorizontal: 20, paddingTop: TOP_PAD, paddingBottom: 20 }}>
+      <TopBar
+        title="Camera"
+        onBack={() => {
+          stopSpeaking();
+          onClose();
+        }}
+      />
 
       {!hasPermission ? (
-        <View>
-          <Body>Saathi needs the camera to look around and read for you. The photo stays on your phone.</Body>
+        <Card style={{ alignItems: 'center', paddingVertical: 32 }}>
+          <IconBadge icon="camera-outline" tone="sage" size={76} />
+          <Text
+            style={{
+              fontSize: fs(18),
+              color: colors.text,
+              lineHeight: fs(26),
+              textAlign: 'center',
+              marginTop: 18,
+            }}
+          >
+            Saathi needs the camera to look around and read for you. The photo stays on your phone.
+          </Text>
           <BigButton label="Allow camera" onPress={askPermission} />
-        </View>
+        </Card>
       ) : !device ? (
-        <Body>No camera was found on this phone.</Body>
+        <Card>
+          <Text style={{ fontSize: fs(18), color: colors.text }}>No camera was found on this phone.</Text>
+        </Card>
       ) : uri ? (
-        <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
-          <Image
-            source={{ uri }}
-            resizeMode="contain"
-            accessibilityLabel="The photo you just took"
-            style={{ height: 220, borderRadius: 16 }}
+        <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <View
+            style={{
+              borderRadius: 28,
+              overflow: 'hidden',
+              backgroundColor: colors.card,
+              marginBottom: 16,
+              ...shadow,
+            }}
+          >
+            <Image
+              source={{ uri }}
+              resizeMode="cover"
+              accessibilityLabel="The photo you just took"
+              style={{ height: 240, width: '100%' }}
+            />
+          </View>
+
+          <ActionRow
+            icon="eye-outline"
+            tone="sage"
+            title="What is around me?"
+            subtitle="Describe objects and where they are"
+            onPress={() => {
+              if (!busy) lookAround();
+            }}
           />
-          <BigButton label="What is around me?" onPress={lookAround} disabled={busy} />
-          <BigButton label="Read text" onPress={() => readText()} disabled={busy} />
+          <ActionRow
+            icon="text-outline"
+            tone="accent"
+            title="Read text"
+            subtitle="Read the printed words aloud"
+            onPress={() => {
+              if (!busy) readText();
+            }}
+          />
+
           {shown ? (
-            <>
+            <Card style={{ marginTop: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                <IconBadge icon={seen ? 'eye-outline' : 'text-outline'} tone={seen ? 'sage' : 'accent'} size={40} />
+                <Text style={{ fontSize: fs(18), fontWeight: '800', color: colors.text, marginLeft: 12 }}>
+                  {seen ? 'What I see' : 'Text found'}
+                </Text>
+              </View>
+              <Text selectable style={{ fontSize: fs(20), lineHeight: fs(29), color: colors.text }}>
+                {shown}
+              </Text>
               <BigButton
                 label={speaking ? 'Stop speaking' : 'Say it again'}
                 onPress={() => (speaking ? stopSpeaking() : speak(lastSpoken || shown))}
               />
-              <Card style={{ marginTop: 12 }}>
-                <Text
-                  selectable
-                  style={{ fontSize: fs(20), lineHeight: fs(28), color: colors.text }}
-                >
-                  {shown}
-                </Text>
-              </Card>
-            </>
+            </Card>
           ) : null}
+
           {seen ? (
-            <>
+            <View style={{ marginBottom: 8 }}>
               {debug ? (
-                <Text selectable style={{ fontSize: fs(14), color: colors.muted, marginTop: 4 }}>
+                <Text selectable style={{ fontSize: fs(13), color: colors.muted, marginBottom: 6 }}>
                   {debug}
                 </Text>
               ) : null}
-              <Body muted>
-                Saathi can miss things or get them wrong. It says where something is, not how far
-                away. It does not replace a cane or a guide.
-              </Body>
-            </>
+              <Text style={{ fontSize: fs(14), color: colors.muted, lineHeight: fs(21) }}>
+                Saathi can miss things or get them wrong. It says where something is, not how far away. It does
+                not replace a cane or a guide.
+              </Text>
+            </View>
           ) : null}
+
+          {statusPill}
+
           <BigButton
             label="Take another photo"
             onPress={() => {
@@ -228,37 +296,41 @@ function CameraInner({ onClose }: { onClose: () => void }) {
       ) : (
         <View style={{ flex: 1 }}>
           <View
-            style={{ flex: 1, borderRadius: 16, overflow: 'hidden' }}
+            style={{ flex: 1, borderRadius: 28, overflow: 'hidden', backgroundColor: '#0F172A', ...shadow }}
             accessibilityLabel="Camera view"
           >
-            <Camera
-              style={StyleSheet.absoluteFill}
-              device={device}
-              isActive={true}
-              outputs={[photoOutput]}
-            />
+            <Camera style={StyleSheet.absoluteFill} device={device} isActive={true} outputs={[photoOutput]} />
+            <View
+              pointerEvents="none"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={{
+                position: 'absolute',
+                top: 14,
+                left: 14,
+                right: 14,
+                alignItems: 'center',
+              }}
+            >
+              <View
+                style={{
+                  backgroundColor: 'rgba(15,23,42,0.6)',
+                  borderRadius: 999,
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                }}
+              >
+                <Text style={{ fontSize: fs(14), color: '#FFFFFF', fontWeight: '600' }}>
+                  Hold steady and point at the text
+                </Text>
+              </View>
+            </View>
           </View>
+          {statusPill}
           <BigButton label="Take photo and read it aloud" onPress={snapAndRead} disabled={busy} />
-          <BigButton label="Take photo" onPress={takePhoto} disabled={busy} />
+          <BigButton label="Take photo" variant="secondary" onPress={takePhoto} disabled={busy} />
         </View>
       )}
-
-      {status ? (
-        <Text
-          accessibilityLiveRegion="polite"
-          style={{ fontSize: fs(18), color: colors.accent, marginTop: 12 }}
-        >
-          {status}
-        </Text>
-      ) : null}
-
-      <BigButton
-        label="Close"
-        onPress={() => {
-          stopSpeaking();
-          onClose();
-        }}
-      />
     </View>
   );
 }

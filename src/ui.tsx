@@ -770,6 +770,37 @@ export function RoundAction({
 
 /* ---------- Screen furniture (top bar, date strip, time chips, bottom button) ---------- */
 
+// A clear "Back" pill: big to tap, with a label so it is not just an arrow.
+export function BackButton({ onPress, label = 'Back' }: { onPress: () => void; label?: string }) {
+  const { fs } = useProfile();
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={12}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [
+        {
+          alignSelf: 'flex-start',
+          flexDirection: 'row',
+          alignItems: 'center',
+          minHeight: 52,
+          paddingLeft: 12,
+          paddingRight: 20,
+          borderRadius: 26,
+          backgroundColor: colors.card,
+          ...shadow,
+        },
+        pressed && styles.pressed,
+      ]}
+    >
+      <Ionicons name="chevron-back" size={24} color={colors.accent} />
+      <Text style={{ fontSize: fs(17), fontWeight: '700', color: colors.accent, marginLeft: 2 }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+// Top of a page: a back pill (and an optional action on the right), then a large title.
 export function TopBar({
   title,
   onBack,
@@ -784,30 +815,36 @@ export function TopBar({
   onRight?: () => void;
 }) {
   const { fs } = useProfile();
-  const circle = {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadow,
-  } as const;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-      <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Back" style={circle}>
-        <Ionicons name="chevron-back" size={24} color={colors.text} />
-      </Pressable>
-      <Text accessibilityRole="header" style={{ fontSize: fs(20), fontWeight: '800', color: colors.text }}>
+    <View style={{ marginBottom: 18 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <BackButton onPress={onBack} />
+        {rightIcon && onRight ? (
+          <Pressable
+            onPress={onRight}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={rightLabel ?? 'Action'}
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 26,
+              backgroundColor: colors.card,
+              alignItems: 'center',
+              justifyContent: 'center',
+              ...shadow,
+            }}
+          >
+            <Glyph icon={rightIcon} color={colors.text} size={22} />
+          </Pressable>
+        ) : null}
+      </View>
+      <Text
+        accessibilityRole="header"
+        style={{ fontSize: fs(30), fontWeight: '800', letterSpacing: -0.5, color: colors.text, marginTop: 16 }}
+      >
         {title}
       </Text>
-      {rightIcon && onRight ? (
-        <Pressable onPress={onRight} accessibilityRole="button" accessibilityLabel={rightLabel ?? 'Action'} style={circle}>
-          <Glyph icon={rightIcon} color={colors.text} size={22} />
-        </Pressable>
-      ) : (
-        <View style={{ width: 48 }} />
-      )}
     </View>
   );
 }

@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StatusBar, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 import { colors } from '../theme';
 import { SIGN_LESSONS, Sign } from '../data/signLessons';
+import { BackButton, TOP_PAD } from '../ui';
 
 const ALL: Sign[] = SIGN_LESSONS.flatMap((c) => c.signs);
 const QUESTIONS = 5;
@@ -62,21 +63,9 @@ export default function SignQuiz({
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Pressable
-        onPress={onBack}
-        accessibilityRole="button"
-        accessibilityLabel="Back"
-        hitSlop={8}
-        style={{
-          paddingHorizontal: 16,
-          paddingBottom: 12,
-          paddingTop: (StatusBar.currentHeight ?? 0) + 12,
-          minHeight: 48,
-          justifyContent: 'center',
-        }}
-      >
-        <Text style={{ fontSize: fs(16), color: colors.accent }}>‹ Back</Text>
-      </Pressable>
+      <View style={{ paddingHorizontal: 16, paddingTop: TOP_PAD, paddingBottom: 8 }}>
+        <BackButton onPress={onBack} />
+      </View>
 
       {finished ? (
         <View style={{ padding: 20 }}>

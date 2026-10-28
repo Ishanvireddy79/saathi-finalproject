@@ -24,6 +24,8 @@ import SpeakScreen from './SpeakScreen';
 import CaptionsScreen from './CaptionsScreen';
 import MedicalIdView from './MedicalId';
 import SosScreen from './SosScreen';
+import ProfileScreen from './ProfileScreen';
+import { UserProfile, EMPTY_USER, firstName, initial, loadUserProfile } from '../userProfile';
 import { Contact, loadContacts } from '../contacts';
 import {
   Appointment,
@@ -59,11 +61,14 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (t: Target) => 
   const [capOpen, setCapOpen] = useState(false);
   const [medIdOpen, setMedIdOpen] = useState(false);
   const [sosOpen, setSosOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [user, setUser] = useState<UserProfile>(EMPTY_USER);
   const [err, setErr] = useState('');
 
   const refresh = useCallback(() => {
-    Promise.all([loadMedicines(), loadAppointments(), loadContacts(), AsyncStorage.getItem(todayKey())])
-      .then(([m, a, c, t]) => {
+    Promise.all([loadMedicines(), loadAppointments(), loadContacts(), AsyncStorage.getItem(todayKey()), loadUserProfile()])
+      .then(([m, a, c, t, u]) => {
+        setUser(u);
         setMeds([...m].sort((x, y) => x.hour * 60 + x.minute - (y.hour * 60 + y.minute)));
         const now = Date.now();
         setAppts(
@@ -117,14 +122,21 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (t: Target) => 
 
       {/* Greeting row */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-        <Avatar label="🙂" tone="accent" size={58} />
+        <Pressable
+          onPress={() => setProfileOpen(true)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="My profile"
+        >
+          <Avatar label={initial(user.name) || '🙂'} tone="accent" size={58} />
+        </Pressable>
         <View style={{ flex: 1, marginLeft: 14 }}>
           <Text style={{ fontSize: fs(15), color: colors.muted }}>{greeting}</Text>
           <Text
             accessibilityRole="header"
             style={{ fontSize: fs(26), fontWeight: '800', letterSpacing: -0.4, color: colors.text }}
           >
-            Hi, friend
+            Hi, {firstName(user.name) || 'friend'}
           </Text>
         </View>
         <Pressable
@@ -356,6 +368,14 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (t: Target) => 
       <CaptionsScreen visible={capOpen} onClose={() => setCapOpen(false)} />
       <MedicalIdView visible={medIdOpen} onClose={() => setMedIdOpen(false)} />
       <SosScreen visible={sosOpen} onClose={() => setSosOpen(false)} />
+      <ProfileScreen
+        visible={profileOpen}
+        onClose={() => {
+          setProfileOpen(false);
+          refresh();
+        }}
+        onChanged={refresh}
+      />
     </ScrollView>
   );
 }

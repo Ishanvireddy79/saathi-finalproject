@@ -4,16 +4,59 @@ import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
 } from 'expo-speech-recognition';
-import { colors } from '../theme';
+import { colors, shadow } from '../theme';
 import { useProfile } from '../ProfileContext';
 import { ErrorBoundary } from '../ErrorBoundary';
-import { BigButton, Body, Title } from '../ui';
+import {
+  BigButton,
+  Chip,
+  Glyph,
+  Group,
+  IconBadge,
+  Segmented,
+  SheetModal,
+  SwitchRow,
+  TOP_PAD,
+  TopBar,
+} from '../ui';
 
 const LANGS = [
   { id: 'en-IN', label: 'English' },
-  { id: 'hi-IN', label: 'Hindi' },
-  { id: 'te-IN', label: 'Telugu' },
+  { id: 'hi-IN', label: 'हिन्दी' },
+  { id: 'te-IN', label: 'తెలుగు' },
 ];
+
+function RoundButton({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: string;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => ({
+        width: 64,
+        height: 64,
+        marginLeft: 10,
+        marginTop: 10,
+        borderRadius: 22,
+        backgroundColor: colors.card,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: pressed ? 0.85 : 1,
+        ...shadow,
+      })}
+    >
+      <Glyph icon={icon} color={colors.accent} size={26} />
+    </Pressable>
+  );
+}
 
 function Inner({ onClose }: { onClose: () => void }) {
   const { fs, profile } = useProfile();
@@ -26,13 +69,16 @@ function Inner({ onClose }: { onClose: () => void }) {
   const [allowOnline, setAllowOnline] = useState(false);
   const [big, setBig] = useState(true);
   const [status, setStatus] = useState('');
+  const [moreOpen, setMoreOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   const wantRef = useRef(false);
   const langRef = useRef(lang);
   const onlineRef = useRef(allowOnline);
-  langRef.current = lang;
-  onlineRef.current = allowOnline;
+  useEffect(() => {
+    langRef.current = lang;
+    onlineRef.current = allowOnline;
+  });
 
   const langName = LANGS.find((l) => l.id === lang)?.label ?? lang;
 
@@ -69,7 +115,7 @@ function Inner({ onClose }: { onClose: () => void }) {
         }
         if (!ok) {
           setStatus(
-            'Your phone cannot make captions offline. If you are happy for the sound to be sent to Google, turn on "Allow online captions".'
+            'Your phone cannot make captions offline. If you are happy for the sound to be sent to Google, open More options and turn on "Allow online captions".'
           );
           return;
         }
@@ -135,13 +181,13 @@ function Inner({ onClose }: { onClose: () => void }) {
     if (code === 'language-not-supported') {
       setStatus(
         langName +
-          ' is not ready for offline captions on this phone. Tap "Download offline pack" below. If that fails with error 12, your phone does not offer ' +
+          ' is not ready for offline captions on this phone. Open More options and tap "Download offline pack". If that fails with error 12, your phone does not offer ' +
           langName +
           ' offline, so turn on "Allow online captions" to use it.'
       );
     } else if (code === 'network') {
       setStatus(
-        'Captions need the internet, or the offline pack. Tap "Download offline pack" while online, then try again.'
+        'Captions need the internet, or the offline pack. Open More options and tap "Download offline pack" while online, then try again.'
       );
     } else if (code === 'not-allowed' || code === 'service-not-allowed') {
       setStatus('The microphone or speech permission is blocked. Please allow it in your phone settings.');
@@ -182,140 +228,147 @@ function Inner({ onClose }: { onClose: () => void }) {
   const textSize = big ? fs(32) : fs(22);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: 56 }}>
-      <View style={{ paddingHorizontal: 20 }}>
-        <Title>Live captions</Title>
-      </View>
+    <View style={{ flex: 1, backgroundColor: colors.bg, paddingHorizontal: 20, paddingTop: TOP_PAD, paddingBottom: 20 }}>
+      <TopBar
+        title="Live captions"
+        onBack={() => {
+          stopListening();
+          onClose();
+        }}
+      />
 
-      <ScrollView
-        ref={scrollRef}
-        style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 20, paddingBottom: 20 }}
-        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+      <Segmented
+        label="Captions language"
+        options={LANGS}
+        value={lang}
+        onChange={(v) => {
+          if (listening) stopListening();
+          setLang(v);
+          setStatus('');
+        }}
+      />
+
+      {/* Caption area */}
+      <View
+        style={{
+          flex: 1,
+          marginTop: 14,
+          backgroundColor: colors.card,
+          borderRadius: 28,
+          overflow: 'hidden',
+          ...shadow,
+        }}
       >
-        {lines.length === 0 && !interim ? (
-          <Body muted>
-            Tap Start captions. Hold the phone near the person who is talking. Their words appear here.
-          </Body>
-        ) : null}
-        {lines.map((l, i) => (
-          <Text
-            key={i}
-            selectable
-            style={{ fontSize: textSize, lineHeight: textSize * 1.35, color: colors.text, marginBottom: 12 }}
-          >
-            {l}
-          </Text>
-        ))}
-        {interim ? (
-          <Text
-            style={{ fontSize: textSize, lineHeight: textSize * 1.35, color: colors.muted, marginBottom: 12 }}
-          >
-            {interim}
-          </Text>
-        ) : null}
-      </ScrollView>
-
-      {status ? (
-        <Text
-          accessibilityLiveRegion="polite"
-          style={{ fontSize: fs(16), color: colors.accent, paddingHorizontal: 20, paddingBottom: 6 }}
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 14 }}>
+          <Chip label={listening ? 'Listening' : 'Ready'} tone={listening ? 'sos' : 'sage'} />
+          <Text style={{ fontSize: fs(13), color: colors.muted, marginLeft: 10 }}>{langName}</Text>
+        </View>
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 18, paddingBottom: 24, flexGrow: 1 }}
+          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         >
-          {status}
-        </Text>
-      ) : null}
-
-      <ScrollView style={{ flexGrow: 0, maxHeight: 360 }} contentContainerStyle={{ padding: 20, paddingTop: 6 }}>
-        <BigButton
-          label={listening ? 'Stop captions' : 'Start captions'}
-          onPress={listening ? stopListening : startListening}
-        />
-
-        <View style={{ flexDirection: 'row', marginTop: 10 }}>
-          {LANGS.map((l) => (
-            <Pressable
-              key={l.id}
-              onPress={() => {
-                if (listening) stopListening();
-                setLang(l.id);
-                setStatus('');
-              }}
-              accessibilityRole="radio"
-              accessibilityLabel={'Captions in ' + l.label}
-              accessibilityState={{ selected: lang === l.id }}
-              style={{
-                flex: 1,
-                minHeight: 64,
-                marginHorizontal: 3,
-                borderRadius: 16,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: lang === l.id ? colors.accent : colors.card,
-                borderWidth: 1.5,
-                borderColor: lang === l.id ? colors.accent : colors.border,
-              }}
-            >
+          {lines.length === 0 && !interim ? (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 30 }}>
+              <IconBadge icon="ear-outline" tone="amber" size={72} />
               <Text
                 style={{
                   fontSize: fs(17),
-                  fontWeight: 'bold',
-                  color: lang === l.id ? colors.accentText : colors.text,
+                  color: colors.muted,
+                  textAlign: 'center',
+                  lineHeight: fs(25),
+                  marginTop: 16,
                 }}
               >
-                {l.label}
+                Tap Start captions and hold the phone near the person who is talking. Their words appear here.
               </Text>
-            </Pressable>
+            </View>
+          ) : null}
+          {lines.map((l, i) => (
+            <Text
+              key={i}
+              selectable
+              style={{ fontSize: textSize, lineHeight: textSize * 1.35, color: colors.text, marginBottom: 14 }}
+            >
+              {l}
+            </Text>
           ))}
-        </View>
+          {interim ? (
+            <Text style={{ fontSize: textSize, lineHeight: textSize * 1.35, color: colors.muted, marginBottom: 14 }}>
+              {interim}
+            </Text>
+          ) : null}
+        </ScrollView>
+      </View>
 
-        <Pressable
-          onPress={() => {
-            if (listening) stopListening();
-            setAllowOnline(!allowOnline);
-            setStatus('');
-          }}
-          accessibilityRole="switch"
-          accessibilityLabel="Allow online captions"
-          accessibilityState={{ checked: allowOnline }}
+      {status ? (
+        <View
           style={{
-            minHeight: 64,
-            marginTop: 10,
-            borderRadius: 16,
-            justifyContent: 'center',
+            backgroundColor: colors.accentSoft,
+            borderRadius: 18,
             paddingHorizontal: 16,
-            backgroundColor: allowOnline ? colors.sage : colors.card,
-            borderWidth: 1.5,
-            borderColor: allowOnline ? colors.sage : colors.border,
+            paddingVertical: 12,
+            marginTop: 12,
           }}
         >
-          <Text style={{ fontSize: fs(16), fontWeight: 'bold', color: allowOnline ? colors.accentText : colors.text }}>
-            {allowOnline
-              ? 'Online captions allowed. The sound is sent to Google. Tap to turn off.'
-              : 'Offline only. The sound stays on this phone. Tap to allow online.'}
+          <Text accessibilityLiveRegion="polite" style={{ fontSize: fs(15), color: colors.accent, fontWeight: '600' }}>
+            {status}
           </Text>
-        </Pressable>
+        </View>
+      ) : null}
 
-        <BigButton label="Download offline pack" onPress={downloadPack} />
-        <BigButton label={big ? 'Smaller text' : 'Bigger text'} onPress={() => setBig(!big)} />
-        <BigButton
-          label="Clear"
+      {/* Controls */}
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ flex: 1 }}>
+          <BigButton
+            label={listening ? 'Stop captions' : 'Start captions'}
+            onPress={listening ? stopListening : startListening}
+          />
+        </View>
+        <RoundButton icon="text-outline" label={big ? 'Smaller text' : 'Bigger text'} onPress={() => setBig(!big)} />
+        <RoundButton
+          icon="trash-outline"
+          label="Clear captions"
           onPress={() => {
             setLines([]);
             setInterim('');
           }}
         />
-        <Body muted>
-          Captions can be wrong, especially in noise or far away, and in Telugu. They do not say who
-          is talking.
-        </Body>
-        <BigButton
-          label="Close"
-          onPress={() => {
-            stopListening();
-            onClose();
-          }}
-        />
-      </ScrollView>
+        <RoundButton icon="options-outline" label="More options" onPress={() => setMoreOpen(true)} />
+      </View>
+
+      <SheetModal visible={moreOpen} title="Caption options" onClose={() => setMoreOpen(false)}>
+        <Group>
+          <SwitchRow
+            icon="cloud-outline"
+            tone="amber"
+            title="Allow online captions"
+            description={
+              allowOnline
+                ? 'The sound is sent to Google to make captions.'
+                : 'Offline only. The sound stays on this phone.'
+            }
+            value={allowOnline}
+            onChange={(v) => {
+              if (listening) stopListening();
+              setAllowOnline(v);
+              setStatus('');
+            }}
+            last
+          />
+        </Group>
+        <BigButton label="Download offline pack" variant="secondary" onPress={downloadPack} />
+        <Text style={{ fontSize: fs(14), color: colors.muted, lineHeight: fs(21), marginTop: 16 }}>
+          Captions can be wrong, especially in noise or far away, and in Telugu. They do not say who is
+          talking.
+        </Text>
+        {status ? (
+          <Text accessibilityLiveRegion="polite" style={{ fontSize: fs(15), color: colors.accent, marginTop: 12 }}>
+            {status}
+          </Text>
+        ) : null}
+      </SheetModal>
     </View>
   );
 }

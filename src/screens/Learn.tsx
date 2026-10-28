@@ -1,23 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Alert,
-  BackHandler,
-  FlatList,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, BackHandler, FlatList, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Speech from 'expo-speech';
-import { colors } from '../theme';
+import { colors, shadow } from '../theme';
 import { useProfile } from '../ProfileContext';
+import {
+  ActionRow,
+  BackButton,
+  BigButton,
+  Card,
+  IconBadge,
+  ProgressBar,
+  ScreenHeader,
+  SectionTitle,
+  TOP_PAD,
+  Tone,
+} from '../ui';
 import { SIGN_LESSONS, Sign, SignCategory } from '../data/signLessons';
 import SignQuiz from './SignQuiz';
 
 const LEARNED_KEY = '@saathi/learned-signs';
-const TEXT: string = (colors as any).text ?? '#1a1a1a';
 
 const SIGN_EMOJI: Record<string, string> = {
   help: '🆘',
@@ -40,6 +42,21 @@ const SIGN_EMOJI: Record<string, string> = {
   where: '❓',
 };
 
+const CATEGORY_LOOK: Record<string, { icon: string; tone: Tone }> = {
+  emergency: { icon: '🚨', tone: 'sos' },
+  'what-happened': { icon: '🩹', tone: 'amber' },
+  talk: { icon: '💬', tone: 'sage' },
+};
+
+// Opens a video search for the official ISLRTC sign for a word.
+function openOfficial(word: string) {
+  const q = encodeURIComponent('ISLRTC Indian Sign Language ' + word);
+  Linking.openURL('https://www.youtube.com/results?search_query=' + q).catch(() => {});
+}
+
+const NOTICE =
+  'These sign descriptions are still being checked against the official ISLRTC dictionary. Please watch the official sign before you rely on one.';
+
 export default function Learn() {
   const { fs } = useProfile();
   const [category, setCategory] = useState<SignCategory | null>(null);
@@ -47,7 +64,6 @@ export default function Learn() {
   const [quiz, setQuiz] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  // Load saved progress once
   useEffect(() => {
     AsyncStorage.getItem(LEARNED_KEY)
       .then((v) => {
@@ -57,13 +73,12 @@ export default function Learn() {
       .finally(() => setLoaded(true));
   }, []);
 
-  // Save progress, but only after the saved value has been loaded
   useEffect(() => {
     if (!loaded) return;
     AsyncStorage.setItem(LEARNED_KEY, JSON.stringify(learned)).catch(() => {});
   }, [learned, loaded]);
 
-  // Phone back button / gesture: go back one level inside Learn
+  // Phone back button or gesture goes back one level inside Learn.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (quiz) {
@@ -80,9 +95,7 @@ export default function Learn() {
   }, [quiz, category]);
 
   const toggleLearned = (id: string) =>
-    setLearned((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+    setLearned((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const markLearned = (id: string) =>
     setLearned((prev) => (prev.includes(id) ? prev : [...prev, id]));
@@ -103,39 +116,48 @@ export default function Learn() {
     );
   }
 
+  const total = SIGN_LESSONS.reduce((n, c) => n + c.signs.length, 0);
+  const doneAll = SIGN_LESSONS.reduce(
+    (n, c) => n + c.signs.filter((s) => learned.includes(s.id)).length,
+    0
+  );
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: 16, paddingTop: (StatusBar.currentHeight ?? 0) + 16 }}
+      contentContainerStyle={{ padding: 20, paddingTop: TOP_PAD, paddingBottom: 32 }}
     >
-      <Text style={{ fontSize: fs(24), fontWeight: 'bold', color: TEXT }}>
-        Learn Signs
-      </Text>
-      <Text style={{ fontSize: fs(15), color: colors.muted, marginBottom: 16 }}>
-        Simple sign language for emergencies. Tap a card to hear it spoken aloud.
-      </Text>
+      <ScreenHeader title="Learn signs" subtitle="Simple sign language for emergencies." />
 
-      <Pressable
-        onPress={() => setQuiz(true)}
-        accessibilityRole="button"
-        accessibilityLabel="Start practice quiz"
-        style={{
-          backgroundColor: colors.accent,
-          borderRadius: 16,
-          padding: 18,
-          marginBottom: 16,
-          alignItems: 'center',
-          minHeight: 56,
-          justifyContent: 'center',
-        }}
-      >
-        <Text style={{ color: colors.accentText, fontSize: fs(18), fontWeight: 'bold' }}>
-          🧠 Practice quiz
+      <Card>
+        <Text style={{ fontSize: fs(15), color: colors.muted }}>Your progress</Text>
+        <Text style={{ fontSize: fs(30), fontWeight: '800', color: colors.text, marginVertical: 4 }}>
+          {doneAll} of {total} learned
         </Text>
-      </Pressable>
+        <ProgressBar value={doneAll} max={total} tone="sage" />
+      </Card>
 
+      <Card style={{ backgroundColor: colors.amberSoft }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+          <IconBadge icon="information-circle-outline" tone="amber" size={40} />
+          <Text style={{ flex: 1, marginLeft: 12, fontSize: fs(14), lineHeight: fs(21), color: colors.text }}>
+            {NOTICE}
+          </Text>
+        </View>
+      </Card>
+
+      <ActionRow
+        icon="🧠"
+        tone="accent"
+        title="Practice quiz"
+        subtitle="Test what you have learned"
+        onPress={() => setQuiz(true)}
+      />
+
+      <SectionTitle>Lessons</SectionTitle>
       {SIGN_LESSONS.map((c) => {
         const done = c.signs.filter((s) => learned.includes(s.id)).length;
+        const look = CATEGORY_LOOK[c.id] ?? { icon: '✋', tone: 'accent' as Tone };
         return (
           <Pressable
             key={c.id}
@@ -145,38 +167,42 @@ export default function Learn() {
             }}
             accessibilityRole="button"
             accessibilityLabel={`${c.title}, ${done} of ${c.signs.length} learned`}
-            style={{
+            style={({ pressed }) => ({
               backgroundColor: colors.card,
-              borderRadius: 16,
+              borderRadius: 26,
               padding: 18,
               marginBottom: 12,
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}
+              opacity: pressed ? 0.9 : 1,
+              ...shadow,
+            })}
           >
-            <Text style={{ fontSize: fs(18), fontWeight: 'bold', color: TEXT }}>
-              {c.title}
-            </Text>
-            <Text style={{ fontSize: fs(14), color: colors.muted, marginTop: 4 }}>
-              {done} of {c.signs.length} learned
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <IconBadge icon={look.icon} tone={look.tone} />
+              <View style={{ flex: 1, marginLeft: 14 }}>
+                <Text style={{ fontSize: fs(19), fontWeight: '700', color: colors.text }}>{c.title}</Text>
+                <Text style={{ fontSize: fs(14), color: colors.muted, marginTop: 2 }}>
+                  {done} of {c.signs.length} learned
+                </Text>
+              </View>
+              <Text style={{ fontSize: 28, color: colors.muted }}>›</Text>
+            </View>
+            <View style={{ marginTop: 14 }}>
+              <ProgressBar value={done} max={c.signs.length} tone={look.tone} />
+            </View>
           </Pressable>
         );
       })}
 
-      <Pressable
+      <BigButton
+        label="Reset progress"
+        variant="secondary"
         onPress={() =>
           Alert.alert('Reset progress?', 'This clears all signs you marked as learned.', [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Reset', style: 'destructive', onPress: () => setLearned([]) },
           ])
         }
-        accessibilityRole="button"
-        accessibilityLabel="Reset learned signs"
-        style={{ padding: 16, alignItems: 'center', minHeight: 48, justifyContent: 'center' }}
-      >
-        <Text style={{ fontSize: fs(15), color: colors.muted }}>Reset progress</Text>
-      </Pressable>
+      />
     </ScrollView>
   );
 }
@@ -198,32 +224,30 @@ function SignList({
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Pressable
-        onPress={onBack}
-        accessibilityRole="button"
-        accessibilityLabel="Back"
-        hitSlop={8}
-        style={{
-          paddingHorizontal: 16,
-          paddingBottom: 12,
-          paddingTop: (StatusBar.currentHeight ?? 0) + 12,
-          minHeight: 48,
-          justifyContent: 'center',
-        }}
-      >
-        <Text style={{ fontSize: fs(16), color: colors.accent }}>‹ Back</Text>
-      </Pressable>
+      <View style={{ paddingHorizontal: 20, paddingTop: TOP_PAD, paddingBottom: 8 }}>
+        <BackButton onPress={onBack} />
+        <Text
+          accessibilityRole="header"
+          style={{ fontSize: fs(28), fontWeight: '800', letterSpacing: -0.4, color: colors.text, marginTop: 14 }}
+        >
+          {category.title}
+        </Text>
+        <Text style={{ fontSize: fs(15), color: colors.muted, marginTop: 2 }}>{category.intro}</Text>
+        <Text style={{ fontSize: fs(13), color: colors.amber, marginTop: 6, lineHeight: fs(19) }}>
+          Being checked against ISLRTC. Watch the official sign before you rely on it.
+        </Text>
+      </View>
 
       <FlatList
         data={category.signs}
         keyExtractor={(s) => s.id}
         extraData={learned}
-        contentContainerStyle={{ padding: 16, paddingTop: 0 }}
+        contentContainerStyle={{ padding: 20, paddingTop: 12 }}
         renderItem={({ item }) => {
           const isLearned = learned.includes(item.id);
+          const selected = sign?.id === item.id;
           return (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-              {/* Card: tap to hear the sign and see how to do it */}
               <Pressable
                 onPress={() => {
                   setSign(item);
@@ -231,33 +255,31 @@ function SignList({
                 }}
                 accessibilityRole="button"
                 accessibilityLabel={`${item.word}. Tap to hear and see how to sign it`}
-                style={{
+                style={({ pressed }) => ({
                   flex: 1,
-                  backgroundColor: colors.card,
-                  borderRadius: 16,
-                  padding: 18,
-                  borderWidth: 2,
-                  borderColor: isLearned ? colors.accent : colors.border,
                   flexDirection: 'row',
                   alignItems: 'center',
-                  minHeight: 72,
-                }}
+                  minHeight: 80,
+                  backgroundColor: colors.card,
+                  borderRadius: 24,
+                  padding: 14,
+                  borderWidth: 2,
+                  borderColor: selected ? colors.accent : 'transparent',
+                  opacity: pressed ? 0.9 : 1,
+                  ...shadow,
+                })}
               >
-                <Text style={{ fontSize: 36, marginRight: 14 }}>
-                  {SIGN_EMOJI[item.id] ?? '✋'}
-                </Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: fs(18), fontWeight: 'bold', color: TEXT }}>
+                <IconBadge icon={SIGN_EMOJI[item.id] ?? '✋'} tone={isLearned ? 'sage' : 'accent'} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={{ fontSize: fs(18), fontWeight: '700', color: colors.text }}>
                     {item.word}
-                    {item.hindi ? `  ·  ${item.hindi}` : ''}
                   </Text>
-                  <Text style={{ fontSize: fs(14), color: colors.muted, marginTop: 2 }}>
-                    Tap to hear it spoken
-                  </Text>
+                  {item.hindi ? (
+                    <Text style={{ fontSize: fs(15), color: colors.muted, marginTop: 2 }}>{item.hindi}</Text>
+                  ) : null}
                 </View>
               </Pressable>
 
-              {/* Separate checkbox: mark as learned / not learned */}
               <Pressable
                 onPress={() => onToggle(item.id)}
                 hitSlop={8}
@@ -265,20 +287,18 @@ function SignList({
                 accessibilityLabel={`Mark ${item.word} as learned`}
                 accessibilityState={{ checked: isLearned }}
                 style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
+                  width: 52,
+                  height: 52,
+                  marginLeft: 10,
+                  borderRadius: 26,
                   borderWidth: 2,
-                  borderColor: isLearned ? colors.accent : colors.border,
-                  backgroundColor: isLearned ? colors.accent : colors.card,
+                  borderColor: isLearned ? colors.sage : colors.border,
+                  backgroundColor: isLearned ? colors.sage : colors.card,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginLeft: 10,
                 }}
               >
-                {isLearned ? (
-                  <Text style={{ color: colors.accentText, fontSize: 22 }}>✓</Text>
-                ) : null}
+                {isLearned ? <Text style={{ color: colors.accentText, fontSize: 24 }}>✓</Text> : null}
               </Pressable>
             </View>
           );
@@ -289,60 +309,29 @@ function SignList({
         <View
           style={{
             backgroundColor: colors.card,
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-            padding: 20,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            padding: 22,
             paddingBottom: 36,
+            ...shadow,
+            shadowOffset: { width: 0, height: -4 },
+            elevation: 12,
           }}
         >
-          <Text style={{ fontSize: fs(18), fontWeight: 'bold', color: colors.accent }}>
+          <Text style={{ fontSize: fs(20), fontWeight: '800', color: colors.accent }}>
             How to sign &quot;{sign.word}&quot;
           </Text>
-          <Text
-            style={{ fontSize: fs(15), color: TEXT, marginTop: 8, lineHeight: fs(22) }}
-          >
+          <Text style={{ fontSize: fs(16), color: colors.text, marginTop: 8, lineHeight: fs(24) }}>
             {sign.howTo}
           </Text>
-
-          <Pressable
-            onPress={() => Speech.speak(sign.say)}
-            accessibilityRole="button"
-            accessibilityLabel="Speak again"
-            style={{
-              marginTop: 14,
-              backgroundColor: colors.accent,
-              borderRadius: 12,
-              padding: 14,
-              alignItems: 'center',
-              minHeight: 48,
-              justifyContent: 'center',
-            }}
-          >
-            <Text style={{ color: colors.accentText, fontSize: fs(16), fontWeight: 'bold' }}>
-              🔊 Speak again
-            </Text>
-          </Pressable>
-
+          <BigButton label="Watch the official sign" onPress={() => openOfficial(sign.word)} />
+          <BigButton label="🔊 Speak again" variant="secondary" onPress={() => Speech.speak(sign.say)} />
           {sign.hindi ? (
-            <Pressable
+            <BigButton
+              label="🔊 हिंदी में सुनें"
+              variant="secondary"
               onPress={() => Speech.speak(sign.hindi as string, { language: 'hi-IN' })}
-              accessibilityRole="button"
-              accessibilityLabel="Speak in Hindi"
-              style={{
-                marginTop: 10,
-                borderWidth: 2,
-                borderColor: colors.accent,
-                borderRadius: 12,
-                padding: 14,
-                alignItems: 'center',
-                minHeight: 48,
-                justifyContent: 'center',
-              }}
-            >
-              <Text style={{ color: colors.accent, fontSize: fs(16), fontWeight: 'bold' }}>
-                🔊 हिंदी में सुनें
-              </Text>
-            </Pressable>
+            />
           ) : null}
         </View>
       ) : null}

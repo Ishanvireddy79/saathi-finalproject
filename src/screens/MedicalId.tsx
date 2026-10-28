@@ -3,7 +3,7 @@ import { Linking, Modal, Pressable, ScrollView, Text, TextInput, View } from 're
 import * as Speech from 'expo-speech';
 import { colors, shadow } from '../theme';
 import { useProfile } from '../ProfileContext';
-import { Avatar, Backdrop, BigButton, Body, Card, Chip, TOP_PAD } from '../ui';
+import { Avatar, Backdrop, BackButton, BigButton, Body, Card, Chip, TOP_PAD } from '../ui';
 import { Contact, loadContacts } from '../contacts';
 import { voiceLanguage } from '../phrases';
 import {
@@ -153,24 +153,9 @@ export default function MedicalIdView({
       >
         <Backdrop />
 
-        <Pressable
-          onPress={close}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          hitSlop={8}
-          style={{
-            alignSelf: 'flex-start',
-            minHeight: 48,
-            paddingHorizontal: 18,
-            borderRadius: 24,
-            justifyContent: 'center',
-            backgroundColor: colors.card,
-            marginBottom: 16,
-            ...shadow,
-          }}
-        >
-          <Text style={{ fontSize: fs(16), fontWeight: '700', color: colors.accent }}>‹ Back</Text>
-        </Pressable>
+        <View style={{ marginBottom: 16 }}>
+          <BackButton onPress={close} />
+        </View>
 
         <Card style={{ alignItems: 'center', paddingVertical: 28 }}>
           <Avatar label={name ? name.charAt(0).toUpperCase() : '🩺'} tone="sos" size={96} />

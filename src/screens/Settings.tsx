@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { Alert, Text, View, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { colors, shadow } from '../theme';
 import { useProfile } from '../ProfileContext';
 import {
   Card,
   ChoiceRow,
+  Glyph,
   Group,
   Row,
   ScreenHeader,
@@ -16,7 +17,17 @@ import {
 import { Lang, Need, TextSize } from '../storage';
 import Contacts from './Contacts';
 import SosGuide from './SosGuide';
+import ProfileScreen from './ProfileScreen';
 import { MedicalIdEditor } from './MedicalId';
+import { EMPTY_USER, UserProfile, initial, loadUserProfile } from '../userProfile';
+import {
+  disableEmergencyCard,
+  enableEmergencyCard,
+  isCardHealthOn,
+  isCardOn,
+  setCardHealth,
+  subscribeCard,
+} from '../emergencyCard';
 
 const LANGS: { id: Lang; label: string; native: string }[] = [
   { id: 'en', label: 'English', native: 'English' },
@@ -35,10 +46,36 @@ type Sheet = 'language' | 'size' | 'medical' | 'contacts' | 'sos' | 'privacy' | 
 export default function Settings() {
   const { profile, update, reset, fs } = useProfile();
   const [sheet, setSheet] = useState<Sheet>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [user, setUser] = useState<UserProfile>(EMPTY_USER);
+  const [cardOn, setCardOn] = useState(false);
+  const [cardHealth, setCardHealthState] = useState(true);
+
+  const loadUser = useCallback(() => {
+    loadUserProfile().then(setUser).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    loadUser();
+    isCardOn().then(setCardOn);
+    isCardHealthOn().then(setCardHealthState);
+    return subscribeCard(setCardOn);
+  }, [loadUser]);
 
   const toggleNeed = (n: Need) => {
     const cur = profile.needs;
     update({ needs: cur.includes(n) ? cur.filter((x) => x !== n) : [...cur, n] });
+  };
+
+  const toggleCard = async (next: boolean) => {
+    const r = next ? await enableEmergencyCard() : await disableEmergencyCard();
+    if (r.ok) setCardOn(next);
+    else Alert.alert('Emergency card', r.message);
+  };
+
+  const toggleCardHealth = async (next: boolean) => {
+    setCardHealthState(next);
+    await setCardHealth(next);
   };
 
   const confirmReset = () => {
@@ -54,6 +91,7 @@ export default function Settings() {
 
   const lang = LANGS.find((l) => l.id === profile.language) ?? LANGS[0];
   const size = SIZES.find((s) => s.id === profile.textSize) ?? SIZES[0];
+  const name = user.name.trim();
 
   return (
     <ScrollView
@@ -62,41 +100,52 @@ export default function Settings() {
     >
       <ScreenHeader title="Settings" />
 
-      {/* Profile card */}
-      <View
-        style={{
+      {/* Profile card: tap to open the full profile */}
+      <Pressable
+        onPress={() => setProfileOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={
+          'My profile. ' + (name || 'Add your name') + (user.phone ? ', ' + user.phone : '') + '. Opens your profile'
+        }
+        style={({ pressed }) => ({
           backgroundColor: colors.accent,
           borderRadius: 28,
           padding: 22,
           marginBottom: 22,
+          opacity: pressed ? 0.92 : 1,
           ...shadow,
           shadowColor: colors.accent,
           shadowOpacity: 0.3,
-        }}
+        })}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
             style={{
-              width: 56,
-              height: 56,
-              borderRadius: 18,
+              width: 60,
+              height: 60,
+              borderRadius: 20,
               backgroundColor: 'rgba(255,255,255,0.18)',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <Text style={{ fontSize: 28, fontWeight: '800', color: '#FFFFFF' }}>S</Text>
+            {initial(user.name) ? (
+              <Text style={{ fontSize: 28, fontWeight: '800', color: '#FFFFFF' }}>{initial(user.name)}</Text>
+            ) : (
+              <Glyph icon="person" color="#FFFFFF" size={30} />
+            )}
           </View>
           <View style={{ marginLeft: 14, flex: 1 }}>
-            <Text style={{ fontSize: fs(24), fontWeight: '800', letterSpacing: -0.4, color: '#FFFFFF' }}>
-              Saathi
+            <Text style={{ fontSize: fs(22), fontWeight: '800', letterSpacing: -0.3, color: '#FFFFFF' }}>
+              {name || 'Add your name'}
             </Text>
             <Text style={{ fontSize: fs(14), color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>
-              Set up for the way you live
+              {user.phone || 'Tap to add your details'}
             </Text>
           </View>
+          <Glyph icon="chevron-forward" color="#FFFFFF" size={22} />
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 16 }}>
           {[lang.native, size.label + ' text'].map((t) => (
@@ -115,7 +164,7 @@ export default function Settings() {
             </View>
           ))}
         </View>
-      </View>
+      </Pressable>
 
       <SectionTitle>Preferences</SectionTitle>
       <Group>
@@ -156,6 +205,26 @@ export default function Settings() {
       <Group>
         <Row icon="medkit-outline" tone="sos" title="Medical ID" onPress={() => setSheet('medical')} />
         <Row icon="people-outline" tone="sage" title="Emergency contacts" onPress={() => setSheet('contacts')} />
+        <SwitchRow
+          icon="phone-portrait-outline"
+          tone="sos"
+          title="Emergency card on lock screen"
+          description="A helper can read your name, medical details and contacts without unlocking your phone"
+          value={cardOn}
+          onChange={toggleCard}
+          last={!cardOn}
+        />
+        {cardOn ? (
+          <SwitchRow
+            icon="medkit-outline"
+            tone="sage"
+            title="Include health details"
+            description="Blood group, allergies, conditions and medicines. Turn off to show only your name and contacts."
+            value={cardHealth}
+            onChange={toggleCardHealth}
+            last
+          />
+        ) : null}
         <Row
           icon="shield-checkmark-outline"
           tone="amber"
@@ -178,7 +247,15 @@ export default function Settings() {
         Saathi 1.0.0
       </Text>
 
-      {/* Sub-pages */}
+      <ProfileScreen
+        visible={profileOpen}
+        onClose={() => {
+          setProfileOpen(false);
+          loadUser();
+        }}
+        onChanged={loadUser}
+      />
+
       <SheetModal visible={sheet === 'language'} title="Language" onClose={() => setSheet(null)}>
         <Group>
           {LANGS.map((l, i) => (

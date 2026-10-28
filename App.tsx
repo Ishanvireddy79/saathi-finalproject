@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, StatusBar, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, AppState, Pressable, StatusBar, Text, View } from 'react-native';
 import { colors, shadow } from './src/theme';
 import { Glyph } from './src/ui';
+import { refreshEmergencyCard } from './src/emergencyCard';
 import { ProfileProvider, useProfile } from './src/ProfileContext';
 import { ErrorBoundary } from './src/ErrorBoundary';
 import Onboarding from './src/screens/Onboarding';
@@ -94,6 +95,15 @@ function Shell() {
   const [tab, setTab] = useState<Tab>('home');
   const [sosOpen, setSosOpen] = useState(false);
   useSosShortcut(() => setSosOpen(true));
+
+  // Keep the lock-screen emergency card up to date when the app starts or is left.
+  useEffect(() => {
+    refreshEmergencyCard();
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'background') refreshEmergencyCard();
+    });
+    return () => sub.remove();
+  }, []);
 
   let screen: React.ReactNode = <Dashboard onNavigate={setTab} />;
   if (tab === 'assistant') screen = <Assistant />;
